@@ -1,0 +1,141 @@
+{
+  "frames": [
+    {
+      "file": "000.png",
+      "label": "锁屏 · 37% 电量",
+      "duration": 1.8
+    },
+    {
+      "file": "001.png",
+      "label": "桌面 · 等待剧情解锁的应用暂不出现",
+      "duration": 1.8
+    },
+    {
+      "file": "002.png",
+      "label": "相册 · Mina 与 Sana 官方照片",
+      "duration": 1.8
+    },
+    {
+      "file": "003.png",
+      "label": "查看照片 · 等待新消息",
+      "duration": 1.8
+    },
+    {
+      "file": "004.png",
+      "label": "第一步 · 照片触发新消息",
+      "duration": 1.8
+    },
+    {
+      "file": "005.png",
+      "label": "第二步 · 聊天触发新备忘录",
+      "duration": 1.8
+    },
+    {
+      "file": "006.png",
+      "label": "备忘录 · 新线索加入列表",
+      "duration": 1.8
+    },
+    {
+      "file": "007.png",
+      "label": "第三步 · 查看备忘录解锁 theqoo",
+      "duration": 1.8
+    },
+    {
+      "file": "008.png",
+      "label": "桌面 · theqoo 已解锁",
+      "duration": 1.8
+    },
+    {
+      "file": "009.png",
+      "label": "第四步 · theqoo 帖子触发后续消息",
+      "duration": 1.8
+    },
+    {
+      "file": "010.png",
+      "label": "第五步 · KakaoTalk 后续对话",
+      "duration": 1.8
+    },
+    {
+      "file": "011.png",
+      "label": "第六步 · 新备忘录解锁 Instagram",
+      "duration": 1.8
+    },
+    {
+      "file": "012.png",
+      "label": "第七步 · Instagram 帖子中的线索",
+      "duration": 1.8
+    },
+    {
+      "file": "013.png",
+      "label": "通话记录 · Sana 的未接来电",
+      "duration": 1.8
+    },
+    {
+      "file": "014.png",
+      "label": "第八步 · 通话详情触发新备忘录",
+      "duration": 1.8
+    },
+    {
+      "file": "015.png",
+      "label": "第九步 · 通话备忘录解锁 X",
+      "duration": 1.8
+    },
+    {
+      "file": "016.png",
+      "label": "第十步 · X 帖子继续推进故事",
+      "duration": 1.8
+    },
+    {
+      "file": "017.png",
+      "label": "第十一步 · 收到新的对话",
+      "duration": 1.8
+    },
+    {
+      "file": "018.png",
+      "label": "第十二步 · Mina 的回复草稿",
+      "duration": 1.8
+    },
+    {
+      "file": "019.png",
+      "label": "第十三步 · 到达故事结局",
+      "duration": 3
+    },
+    {
+      "file": "020.png",
+      "label": "分支示例 · 重新开始",
+      "duration": 1.5
+    },
+    {
+      "file": "021.png",
+      "label": "选择 · 直接问 Sana，或继续寻找线索",
+      "duration": 3
+    },
+    {
+      "file": "022.png",
+      "label": "选择 A · 下一步转向 KakaoTalk",
+      "duration": 1.8
+    },
+    {
+      "file": "023.png",
+      "label": "分支 A · 不同选择进入不同结局",
+      "duration": 3
+    },
+    {
+      "file": "024.png",
+      "label": "选择 B · 继续查看备忘录",
+      "duration": 1.8
+    },
+    {
+      "file": "025.png",
+      "label": "分支 B · 到达另一种结局",
+      "duration": 3
+    }
+  ],
+  "linearCount": 20,
+  "source": "Real browser interactions captured as sequential screenshots; not a historical continuous recording.",
+  "crop": {
+    "method": "centered card; only blank outer page margins removed",
+    "width": 580,
+    "height": 1274
+  }
+}

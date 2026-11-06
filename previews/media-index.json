@@ -1,0 +1,132 @@
+[
+  {
+    "file": "editor-apps.png",
+    "type": "PNG",
+    "size": [
+      1778,
+      1234
+    ],
+    "bytes": 105607
+  },
+  {
+    "file": "editor-chat.png",
+    "type": "PNG",
+    "size": [
+      1778,
+      1234
+    ],
+    "bytes": 112989
+  },
+  {
+    "file": "editor-instagram.png",
+    "type": "PNG",
+    "size": [
+      1778,
+      1234
+    ],
+    "bytes": 111464
+  },
+  {
+    "file": "editor-story.png",
+    "type": "PNG",
+    "size": [
+      1778,
+      1234
+    ],
+    "bytes": 101814
+  },
+  {
+    "file": "reader-album.png",
+    "type": "PNG",
+    "size": [
+      580,
+      1274
+    ],
+    "bytes": 190598
+  },
+  {
+    "file": "reader-choice.png",
+    "type": "PNG",
+    "size": [
+      580,
+      1274
+    ],
+    "bytes": 185854
+  },
+  {
+    "file": "reader-ending.png",
+    "type": "PNG",
+    "size": [
+      580,
+      1274
+    ],
+    "bytes": 194415
+  },
+  {
+    "file": "reader-instagram.png",
+    "type": "PNG",
+    "size": [
+      580,
+      1274
+    ],
+    "bytes": 320537
+  },
+  {
+    "file": "reader-kakao.png",
+    "type": "PNG",
+    "size": [
+      580,
+      1274
+    ],
+    "bytes": 253644
+  },
+  {
+    "file": "reader-lock.png",
+    "type": "PNG",
+    "size": [
+      580,
+      1274
+    ],
+    "bytes": 200113
+  },
+  {
+    "file": "reader-notes.png",
+    "type": "PNG",
+    "size": [
+      580,
+      1274
+    ],
+    "bytes": 144324
+  },
+  {
+    "file": "reader-theqoo.png",
+    "type": "PNG",
+    "size": [
+      580,
+      1274
+    ],
+    "bytes": 221451
+  },
+  {
+    "file": "ficphone-creator.gif",
+    "type": "GIF",
+    "size": [
+      1200,
+      832
+    ],
+    "frames": 30,
+    "duration_seconds": 15.0,
+    "bytes": 442389
+  },
+  {
+    "file": "ficphone-overview.gif",
+    "type": "GIF",
+    "size": [
+      580,
+      1274
+    ],
+    "frames": 135,
+    "duration_seconds": 27.0,
+    "bytes": 1392201
+  }
+]
