@@ -1,0 +1,23 @@
+{
+  "name": "FicPhone",
+  "color": "#002FA7",
+  "backgrounds": [
+    "#FFFFFF",
+    "#F5F7FB"
+  ],
+  "icon_viewbox": [
+    0,
+    0,
+    512,
+    512
+  ],
+  "wordmark_outlined": true,
+  "horizontal_viewbox": [
+    0,
+    0,
+    1571.909,
+    428
+  ],
+  "reference_used_as": "Visual reference only; all geometry redrawn. No embedded raster assets.",
+  "wordmark": "Outlined Arial Rounded MT Bold with optical weight adjustment; no font files bundled."
+}

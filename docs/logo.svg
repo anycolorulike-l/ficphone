@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+<title id="title">FicPhone phone and quotation icon</title>
+<g transform="translate(-51.2 -51.2) scale(1.2)"><g id="phone-symbol" fill="#002FA7">
+  <rect x="132" y="66" width="248" height="380" rx="64"/>
+  <rect x="152" y="119" width="208" height="270" rx="30" fill="#FFFFFF"/>
+  <rect x="222" y="89" width="68" height="14" rx="7" fill="#FFFFFF"/>
+  <circle cx="256" cy="416" r="17" fill="#FFFFFF"/>
+  <path d="M218 171H294C322 171 343 193 343 221V259C343 287 322 308 294 308H281C264 308 246 333 211 345C220 332 224 319 223 308H218C190 308 169 287 169 259V220C169 193 190 171 218 171Z"/>
+  <g id="quotation-marks" fill="#FFFFFF">
+    <path d="M245 205C223 207 205 225 205 247C205 261 214 269 226 269C238 269 246 261 246 250C246 240 239 233 228 232C231 223 238 216 245 211C248 209 248 205 245 205Z"/>
+    <path d="M296 205C274 207 256 225 256 247C256 261 265 269 277 269C289 269 297 261 297 250C297 240 290 233 279 232C282 223 289 216 296 211C299 209 299 205 296 205Z"/>
+  </g>
+</g></g>
+</svg>

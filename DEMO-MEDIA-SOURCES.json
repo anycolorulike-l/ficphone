@@ -1,0 +1,9 @@
+{
+  "retrieved": "2026-11-06",
+  "source_page": "https://twice.jype.com/profile",
+  "description": "Two official public profile photos; the site-provided 640px WebP versions are bundled locally. These are sample assets, not photographs depicting the fictional story. No Instagram post text or live engagement statistics are imported.",
+  "photos": [
+    {"member": "MINA", "file": "docs/assets/mina.webp", "original": "https://d1meds70430yck.cloudfront.net/artist/twice/506c189bfa134a87a02ca6af4b07aa18-6%E1%84%86%E1%85%B5%E1%84%82%E1%85%A1.png", "account_url": "https://www.instagram.com/mina_sr_my/"},
+    {"member": "SANA", "file": "docs/assets/sana.webp", "original": "https://d1meds70430yck.cloudfront.net/artist/twice/abc9688970fd4b9793fc26b86e8f5dc4-4%E1%84%89%E1%85%A1%E1%84%82%E1%85%A1.png", "account_url": "https://www.instagram.com/m.by__sana/"}
+  ]
+}
