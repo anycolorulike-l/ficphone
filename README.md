@@ -1,3 +1,5 @@
+<img width="1572" height="428" alt="image" src="https://github.com/user-attachments/assets/42722489-e067-4a4f-a58c-b3fd8edddbc4" />
+
 # FicPhone · Found-phone story maker and chat screenshot editor
 
 Create interactive found-phone stories, K-pop fanfiction and social media AUs in your browser. Readers can open apps, explore conversations, browse photos and follow clues through a fictional phone. You can also create standalone chat, social media and forum screenshots.
