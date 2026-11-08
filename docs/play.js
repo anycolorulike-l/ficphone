@@ -28,7 +28,7 @@
    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src 'unsafe-inline'; img-src data:; media-src data:; font-src data: ${new URL(base).origin}">
    <style>body{margin:0;background:#f4f5fa}main{display:flex;flex-direction:column;height:100dvh}#phone{width:100%;flex:1;min-height:0;display:flex;align-items:center}nav{text-align:center;padding:5px;font:13px system-ui}button{font:inherit}main.screen nav{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}main.screen nav:focus-within{width:auto;height:auto;clip-path:none;bottom:0;z-index:2}</style>
    <main><div id="phone"></div><nav><button id="reset">重新开始</button></nav></main>
-   <script nonce="${nonce}" src="${url('icons.js?v=v1.0.1-beta.1-drafts')}"></script><script nonce="${nonce}" src="${url('story.js?v=v1.0.1-beta.1')}"></script><script nonce="${nonce}" src="${url('render.js?v=v1.0.1-beta.1-type-layout2')}"></script>
+   <script nonce="${nonce}" src="${url('icons.js?v=v1.0.1-beta.1-drafts')}"></script><script nonce="${nonce}" src="${url('story.js?v=v1.0.1-beta.1-story99')}"></script><script nonce="${nonce}" src="${url('render.js?v=v1.0.1-beta.1-story99')}"></script>
    <script nonce="${nonce}">const PocketFontData=${JSON.stringify(fonts)};const story=${data};if(story.phone.readerLayout==='screen')document.querySelector('main').className='screen';
    const reader=Pocket.mount(document.getElementById('phone'),story,{mode:'phone',frame:true,fitHeight:true,exported:true,resume:${saved},onJournal:progress=>parent.postMessage({type:'ficphone-progress',progress},'*')});
    document.getElementById('reset').onclick=()=>reader.reset();</script>`;

@@ -90,3 +90,17 @@
 #editor-form>details.settings-group[open]>summary{border-bottom:1px solid #dce5f6;border-radius:9px 9px 0 0}
 #editor-form>details.settings-group>.settings-fields{padding:14px 15px 16px}
 #editor-form>details.settings-group .settings-fields details>summary{background:#f5f7fb;color:#435773;font-size:13px;font-weight:600;cursor:pointer}
+
+.phone-modes{display:flex;align-items:center;gap:8px;padding-left:16px;border-left:1px solid var(--line)}
+.phone-modes[hidden]{display:none}
+#phone-mode-label{color:var(--muted);font-size:.9em}
+.phone-modes .modes{background:#eaf0fb}
+.phone-modes .modes button{padding-inline:12px}
+.phone-modes .modes button[aria-pressed=true]{color:#002fa7;font-weight:600}
+.release-list{display:grid;gap:10px}
+.release-entry{border:1px solid var(--line);border-radius:10px;background:#fff}
+.release-entry summary{cursor:pointer;padding:12px 14px}
+.release-entry time{float:right;margin-left:12px;color:var(--muted);font-size:.9em;font-variant-numeric:tabular-nums}
+.release-entry ul{margin:0;padding:0 20px 14px 34px}
+.release-entry li+li{margin-top:6px}
+@media(max-width:650px){.phone-modes{padding-left:0;border-left:0}}

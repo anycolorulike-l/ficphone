@@ -1,11 +1,11 @@
 /* Self-contained story engine, also embedded in standalone reader exports. */
 function FicStoryRuntime(){
  'use strict';
- const MAX_STEPS=13,events=['start','photo','note','chat','post','call','app','like','reply'],actionTypes=['message','prepareReply','note','unlock','choice','ending'];
+ const MAX_STEPS=99,events=['start','photo','note','chat','post','call','app','like','reply'],actionTypes=['message','prepareReply','note','unlock','choice','ending'];
  const text=(v,n=10000)=>String(v??'').slice(0,n),clone=v=>JSON.parse(JSON.stringify(v));
  function normalize(raw){
   const input=raw&&typeof raw==='object'?raw:{};
-  if(Array.isArray(input.steps)&&input.steps.length>MAX_STEPS)throw Error('当前测试版最多支持 13 个剧情步骤。请保留原工程，分成章节导入。');
+  if(Array.isArray(input.steps)&&input.steps.length>MAX_STEPS)throw Error('当前最多支持 '+MAX_STEPS+' 个剧情步骤。请保留原工程，分成章节导入。');
   const ids=new Set();
   return {version:1,enabled:input.enabled!==false,steps:(Array.isArray(input.steps)?input.steps:[]).map((s,i)=>{
    s=s&&typeof s==='object'?s:{};let id=/^[\w-]{1,80}$/.test(s.id)?s.id:'step-'+(i+1);if(ids.has(id))id='step-'+i+'-'+id;ids.add(id);
@@ -39,6 +39,7 @@ function FicStoryRuntime(){
   function log(message){data.log.push(text(message,250));data.log=data.log.slice(-80);}
   const matches=(e,c)=>e.event===c.event&&(c.target==='*'||String(e.target)===String(c.target));
   const has=c=>data.seen.some(e=>matches(e,c));
+  const clues=story.steps.flatMap(step=>step.clues);
   function apply(index,at=clock()){const step=story.steps[index];if(!step)return;data.pending=null;data.completed.push(step.id);data.cursor=index+1;
    step.actions.forEach((a,j)=>{
     if(a.type==='message')data.messages.push({id:'story-'+step.id+'-'+j,app:a.app,who:a.who,text:a.text,...(a.room?{room:a.room}:{}),...(a.withdrawAfter?{withdrawAt:at+a.withdrawAfter*1000}:{})});
@@ -49,11 +50,30 @@ function FicStoryRuntime(){
     if(a.type==='ending')data.ending={title:a.title,text:a.text};
    });log('✓ '+(index+1)+'. '+step.title);
   }
-  function dispatch(event,target='*',record=true,advance=true,at=clock()){if(!story.enabled||!events.includes(event))return false;const e={event,target:String(target)};const fresh=!data.seen.some(v=>v.event===e.event&&v.target===e.target);if(fresh){data.seen.push(e);if(record)journal.push({type:advance?'event':'observe',...e,at});}
-   if(!advance)return false;
-   if(data.pending||data.choice||data.ending)return false;const step=story.steps[data.cursor];if(!step||!matches(e,{event:step.trigger,target:step.target}))return false;
-   const checks=step.clues.map(has);if(checks.length&&!(step.match==='any'?checks.some(Boolean):checks.every(Boolean))){log('等待额外线索：'+step.title);return false;}
-   if(record&&!fresh)journal.push({type:'event',...e,at});if(step.delay){data.pending={index:data.cursor,due:at+step.delay*1000};log('等待 '+step.delay+' 秒：'+step.title);}else apply(data.cursor,at);return true;
+  function dispatch(event,target='*',record=true,advance=true,at=clock()){
+   if(!story.enabled||!events.includes(event))return false;
+   const e={event,target:String(target)};
+   // Save observations that matter to a clue or to the reader's restored likes.
+   const newClue=clues.some(c=>matches(e,c)&&!has(c));
+   const fresh=!data.seen.some(v=>v.event===event&&v.target===e.target);
+   if(fresh)data.seen.push(e);
+   const step=story.steps[data.cursor];
+   let canAdvance=advance&&!data.pending&&!data.choice&&!data.ending&&step&&matches(e,{event:step.trigger,target:step.target});
+   if(canAdvance&&step.clues.length){
+    const checks=step.clues.map(has);
+    canAdvance=step.match==='any'?checks.some(Boolean):checks.every(Boolean);
+    if(!canAdvance)log('等待额外线索：'+step.title);
+   }
+   if(record){
+    if(canAdvance)journal.push({type:'event',...e,at});
+    else if(newClue||event==='like'&&fresh)journal.push({type:'observe',...e,at});
+   }
+   if(!canAdvance)return false;
+   if(step.delay){
+    data.pending={index:data.cursor,due:at+step.delay*1000};
+    log('等待 '+step.delay+' 秒：'+step.title);
+   }else apply(data.cursor,at);
+   return true;
   }
   function tick(record=true,at=clock()){
    if(!data.pending||at<data.pending.due)return false;
@@ -72,10 +92,23 @@ function FicStoryRuntime(){
   }
   function choose(index,record=true){const choice=data.choice,option=choice?.options[index];if(!option)return false;if(record)journal.push({type:'choice',index});data.choice=null;log('选择：'+option.label);if(option.next==='end'){data.ending={title:option.label,text:''};return true;}if(option.next!=='next'){const n=Number(option.next)-1;if(Number.isInteger(n)&&n>choice.step&&n<story.steps.length)data.cursor=n;}return true;}
   if(resume?.fingerprint===fingerprint&&Array.isArray(resume.journal)){
-   for(const item of resume.journal.slice(0,600)){if(['event','observe'].includes(item?.type)&&events.includes(item.event)){const at=Number.isFinite(item.at)?item.at:clock();dispatch(item.event,text(item.target,100),false,item.type==='event',at);journal.push({type:item.type,event:item.event,target:text(item.target,100),at});}else if(item?.type==='tick'&&data.pending){const at=Number.isFinite(item.at)?item.at:clock();data.pending.due=at;tick(false,at);journal.push({type:'tick',at});}else if(item?.type==='response'&&typeof item.id==='string'){const at=Number.isFinite(item.at)?item.at:clock();if(respond(item.id,false,at))journal.push({type:'response',id:item.id,at});}else if(item?.type==='choice'&&[0,1].includes(item.index)){choose(item.index,false);journal.push({type:'choice',index:item.index});}}
+   // Accept the previous event journal and compact it while replaying.
+   for(const item of resume.journal.slice(0,2048)){
+    const at=Number.isFinite(item?.at)?item.at:clock();
+    if(['event','observe'].includes(item?.type)&&events.includes(item.event)){
+     dispatch(item.event,text(item.target,100),true,item.type==='event',at);
+    }else if(item?.type==='tick'&&data.pending){
+     data.pending.due=at;
+     tick(true,at);
+    }else if(item?.type==='response'&&typeof item.id==='string'){
+     respond(item.id,true,at);
+    }else if(item?.type==='choice'&&[0,1].includes(item.index)){
+     choose(item.index);
+    }
+   }
    log('已恢复阅读进度');
   }
-  return {story,dispatch,visit(list){const cursor=data.cursor;for(const e of list)dispatch(e.event,e.target,true,data.cursor===cursor);},tick,choose,respond,snapshot:()=>clone(data),save:()=>({fingerprint,journal:clone(journal.slice(0,600))}),reset(){Object.assign(data,{cursor:0,completed:[],seen:[],messages:[],replies:[],notes:[],unlocked:[],choice:null,ending:null,pending:null,log:[]});journal.length=0;}};
+  return {story,dispatch,visit(list){const cursor=data.cursor;for(const e of list)dispatch(e.event,e.target,true,data.cursor===cursor);},tick,choose,respond,snapshot:()=>clone(data),save:()=>({fingerprint,journal:clone(journal)}),reset(){Object.assign(data,{cursor:0,completed:[],seen:[],messages:[],replies:[],notes:[],unlocked:[],choice:null,ending:null,pending:null,log:[]});journal.length=0;}};
  }
  return {MAX_STEPS,events,actionTypes,normalize,migrate,demo,engine,signature};
 }

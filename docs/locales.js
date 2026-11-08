@@ -175,6 +175,18 @@ Optional hints, open only when requested|독자가 누르면 힌트 표시|読�
 Optional hints, initially on|선택형 힌트|任意のヒント
 Connect clues into a story|단서를 연결해 이야기 만들기|手がかりをつないで物語に
 Enable story flow|스토리 흐름 사용|物語の進行を有効にする
+Reading mode|읽기 방식|読書モード
+Trigger messages, app unlocks and branches with clues|단서로 메시지와 앱 잠금 해제, 분기를 시작합니다|手がかりでメッセージやアプリの解除、分岐を起動します
+Readers explore chats, photos and notes in any order|독자가 채팅, 사진, 메모를 원하는 순서로 둘러봅니다|チャット、写真、メモを好きな順番で探索できます
+New interactive phone|새 인터랙티브 휴대폰|新しいインタラクティブスマホ
+Free exploration|자유 탐색|自由探索
+Story exploration|스토리 탐색|ストーリー探索
+Step range|단계 범위|ステップ範囲
+Starting a new work saves a copy of your project and carries over the phone appearance and app settings.|새 작품을 만들면 현재 프로젝트를 보관하고 휴대폰 외관과 앱 설정을 이어받습니다.|新しい作品を作ると現在のプロジェクトを保存し、スマホの外観とアプリ設定を引き継ぎます。
+Add chats, photos and notes for readers to explore in any order.|채팅, 사진, 메모를 넣고 독자가 원하는 순서로 탐색하게 합니다.|チャット、写真、メモを入れて、読者が自由な順番で探索できます。
+Use clues to trigger messages, app unlocks and branches in up to 99 steps.|최대 99단계의 단서로 메시지, 앱 잠금 해제와 분기를 설정합니다.|最大99ステップの手がかりで、メッセージ、アプリの解除、分岐を設定できます。
+Story exploration · Use clues to advance the story|스토리 탐색 · 단서로 이야기를 진행하세요|ストーリー探索 · 手がかりで物語を進める
+Free exploration · Let readers explore in any order|자유 탐색 · 원하는 순서로 둘러보기|自由探索 · 好きな順番で探索する
 Load 13-step demo|13단계 예시 불러오기|13ステップの例を読み込む
 Add step|단계 추가|ステップを追加
 Step title|단계 이름|ステップ名
@@ -247,7 +259,7 @@ The owner and contact occupy two slots. Add up to seven others; script sender na
 Chat and social content is shared with screenshot mode.|대화와 SNS 콘텐츠는 스크린샷 모드와 공유됩니다.|会話とSNSの内容はスクリーンショットモードと共有します。
 Multiple notes open as a list; a single note opens directly.|메모가 여러 개면 목록을, 하나면 내용을 바로 엽니다.|メモが複数なら一覧、1件なら本文を直接開きます。
 Disabled apps are absent from the reader and cannot be opened through notifications. Screenshot templates remain available.|사용하지 않는 앱은 작품에 표시되지 않으며 알림으로도 열 수 없습니다. 스크린샷 템플릿은 계속 사용할 수 있습니다.|無効なアプリは作品に表示されず、通知からも開けません。画像テンプレートは引き続き使えます。
-Up to 13 steps and 3 actions per step. Each step waits for a new reader event.|최대 13단계, 단계별 결과는 3개입니다. 다음 단계는 새로운 독자 행동을 기다립니다.|最大13ステップ、各ステップに結果3件まで。次のステップは新しい読者の行動を待ちます。
+Up to 99 steps and 3 actions per step. Each step waits for a new reader event.|최대 99단계, 단계별 결과는 3개입니다. 다음 단계는 새로운 독자 행동을 기다립니다.|最大99ステップ、各ステップに結果3件まで。次のステップは新しい読者の行動を待ちます。
 After the previous step, wait for:|이전 단계가 끝나면 기다릴 행동:|前のステップ終了後、待つ行動：
 After the story starts, wait for:|이야기가 시작되면 기다릴 행동:|物語開始後、待つ行動：
 Enable this app under Apps and mark it initially locked.|앱 설정에서 사용을 켜고 시작 시 잠금을 선택하세요.|アプリ設定で有効にして「開始時はロック」を選んでください。
@@ -277,7 +289,7 @@ Open story settings|스토리 설정 열기|物語設定を開く
 Save a copy first|먼저 사본을 저장하세요|先にコピーを保存
 Choose a platform, then edit messages or posts. Duplicate up to nine independent sheets with different times, and export a ZIP. Up to nine images per item; swipe social images horizontally.|플랫폼을 골라 대화나 게시물을 편집하세요. 시간과 내용이 다른 화면을 최대 9개 만들고 ZIP으로 내보낼 수 있습니다. 첨부 이미지는 최대 9장, SNS 이미지는 가로로 넘겨 봅니다.|プラットフォームを選び、会話や投稿を編集します。時刻の異なる画面を最大9枚作成しZIP出力できます。添付画像は最大9枚、SNS画像は横にスワイプできます。
 Drafts stay in this browser. Export JSON backups regularly; JSON is editable, while PNG and HTML are finished works. Export JSON before switching devices or site addresses. Undo/redo restores recent edits.|초안은 이 브라우저에 저장됩니다. JSON을 정기적으로 백업하세요. JSON은 재편집용, PNG와 HTML은 완성본입니다. 기기나 주소를 바꾸기 전에 JSON을 내보내세요. 실행 취소로 최근 편집을 복원할 수 있습니다.|下書きはこのブラウザに保存されます。JSONは再編集用、PNGとHTMLは完成品です。端末やURLを変える前にJSONを保存してください。最近の編集は元に戻せます。
-Configure apps, content and up to thirteen story steps in Interactive phone. Disabled apps are absent. Authors can allow hints and write two hint levels per step. Opening this guide preserves your preview.|인터랙티브 휴대폰에서 앱, 콘텐츠, 최대 13단계를 설정합니다. 사용하지 않는 앱은 숨겨집니다. 단계마다 두 수준의 힌트를 작성할 수 있습니다. 안내를 열어도 테스트 진행은 유지됩니다.|アプリ、内容、最大13ステップを設定します。無効なアプリは非表示です。ステップごとに2段階のヒントを書けます。このガイドを開いてもテストの進行は維持されます。
+Configure apps, content and up to 99 story steps in Interactive phone. Disabled apps are absent. Authors can allow hints and write two hint levels per step. Opening this guide preserves your preview.|인터랙티브 휴대폰에서 앱, 콘텐츠, 최대 99단계를 설정합니다. 사용하지 않는 앱은 숨겨집니다. 단계마다 두 수준의 힌트를 작성할 수 있습니다. 안내를 열어도 테스트 진행은 유지됩니다.|アプリ、内容、最大99ステップを設定します。無効なアプリは非表示です。ステップごとに2段階のヒントを書けます。このガイドを開いてもテストの進行は維持されます。
 Export interactive HTML, rename it index.html and place it in a folder. Upload to a static web host to get a playable URL. A file-download link is not web hosting. Keep your project JSON private.|인터랙티브 HTML을 내보내 index.html로 바꾸고 폴더에 넣으세요. 정적 웹 호스팅에 올리면 링크를 얻습니다. 파일 다운로드 링크와는 다릅니다. 프로젝트 JSON은 따로 보관하세요.|HTMLを書き出し、index.htmlに改名してフォルダへ入れます。静的ホスティングにアップロードするとURLが発行されます。ファイル配布リンクとは異なります。JSONは手元に保管してください。
 Create a public repository, upload index.html and commit.|공개 저장소를 만들고 index.html을 올린 후 커밋합니다.|公開リポジトリを作り、index.htmlをアップロードしてコミットします。
 Select main and /(root), save and wait for deployment.|main과 /(root)를 선택해 저장하고 게시를 기다립니다.|mainと/(root)を選び、保存して公開を待ちます。

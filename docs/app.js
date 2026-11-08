@@ -12,6 +12,8 @@
  let state=defaults(),section='appearance',player=null,db=null,saveTimer,toastTimer,saveSerial=0,queuedSave=Promise.resolve(),renderedMode=null,previewRoute=null;
  let storyOpen=new Set(['0']),contentIndex=-1,recoveryBlocked=false,exportBusy=false,undoStack=[],redoStack=[],lastHistory='',lastHistoryAt=0;
  const templateList=Object.entries(P.templates);
+ const STORY_PAGE_SIZE=20;
+ let storyPage=0;
  const languages=[['en','English'],['zh','中文'],['ko','한국어'],['ja','日本語']];
  function legacyAppName(value,type){const text=String(value||'').trim();const known=[P.appTypes[type],...Object.values(P.appNames).map(names=>names[type]),...(type==='forum'?['论坛','NAVER Café','네이버 카페']:[])];return known.includes(text)?'':text.slice(0,40);}
  function toast(text){$('#toast').textContent=text;$('#toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('visible'),5000);}
@@ -75,7 +77,7 @@
     check('在互动作品中嵌入字体（请确认许可）','phone.embedFont',phone.embedFont):'')+
    `<p class="helper font-demo" style="font-family:${P.fontStack(phone.font)}">오늘도 좋아해 ♡ / きょうも好き / 今天也喜欢你 / Love you!</p>`;
  }
- function renderNavigation(){if(state.mode==='screenshot'){$('#nav-label').textContent='截图模板';$('#navigation').innerHTML=templateList.map(([id,t])=>`<button data-template="${id}" aria-current="${state.template===id}"><span class="templateicon ${id}">${id==='instagram'&&P.image(window.PocketIcons?.instagram)?`<img alt="" src="${P.image(window.PocketIcons.instagram)}">`:t.mark}</span>${t.name}</button>`).join('');}else{$('#nav-label').textContent='手机与内容';$('#navigation').innerHTML=[['appearance','手机外观'],['apps','桌面应用'],['contents','应用内容'],['photos','相册与备忘录'],['rules','剧情触发']].map(([id,t])=>`<button data-section="${id}" aria-current="${section===id}">${t}</button>`).join('');}
+ function renderNavigation(){if(state.mode==='screenshot'){$('#nav-label').textContent='截图模板';$('#navigation').innerHTML=templateList.map(([id,t])=>`<button data-template="${id}" aria-current="${state.template===id}"><span class="templateicon ${id}">${id==='instagram'&&P.image(window.PocketIcons?.instagram)?`<img alt="" src="${P.image(window.PocketIcons.instagram)}">`:t.mark}</span>${t.name}</button>`).join('');}else{$('#nav-label').textContent='手机与内容';$('#navigation').innerHTML=[['appearance','手机外观'],['apps','桌面应用'],['contents','应用内容'],['photos','相册与备忘录'],...(state.phone.story.enabled?[['rules','剧情触发']]:[])].map(([id,t])=>`<button data-section="${id}" aria-current="${section===id}">${t}</button>`).join('');}
   $('#navigation').querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>{syncSheets();state.template=b.dataset.template;contentIndex=-1;render();scheduleSave();});$('#navigation').querySelectorAll('[data-section]').forEach(b=>b.onclick=()=>{section=b.dataset.section;previewRoute=section==='photos'?'notes':section==='appearance'?((state.phone.lockCode?'lock':state.phone.readerStart||'lock')):'home';render();});}
  function chatFields(base,draft){
   const script=field('对话脚本',base+'.script',draft.script,'textarea','每行“名字：消息”；单条时间写法为“名字：[23:08] 消息”。“我”表示手机主人；单独写“[图片]”可插入下面上传的聊天图片。')+
@@ -122,19 +124,27 @@
    settingsGroup('shot-font','字体与字号',fontFields());
  }
  function showProgress(p,story){const step=story.steps[p.cursor],lines=[!story.enabled?'剧情流程未启用':p.ending?'已到达结局':p.choice?'等待读者选择':p.pending?'等待延迟动作':'等待：'+(step?step.title:'流程已完成'),`已完成 ${p.completed.length} / ${story.steps.length} 步`,...p.log.slice(-8)];$('#reader-debug-body').textContent=lines.join('\n');}
- function storyTargets(kind,index=13){const any=[['*','任意一项']];if(kind==='photo')return [...any,...state.phone.photos.map((_,i)=>[String(i),'照片 '+(i+1)])];if(kind==='note')return [...any,...state.phone.noteItems.map(n=>[n.id,n.title||'无标题']),...state.phone.story.steps.slice(0,index).flatMap(s=>s.actions.map((a,j)=>a.type==='note'?['story-'+s.id+'-'+j,'剧情生成：'+(a.title||'备忘录')]:null).filter(Boolean))];if(kind==='chat'||kind==='reply')return [...any,...Object.entries(P.templates).filter(([,t])=>t.kind==='chat').flatMap(([k,t])=>P.items(state,k).map(d=>[d.id,t.name+' · '+(d.roomTitle||state.partner)]))];if(kind==='like'||kind==='post')return [...any,...['instagram','x','forum'].flatMap(k=>P.items(state,k).map(d=>[d.id,P.templates[k].name+' · '+(d.title||d.body?.slice(0,15)||'帖子')]))];if(kind==='call')return [...any,...String(state.phone.calls).split('\n').filter(Boolean).map((line,i)=>[String(i),line.split('·')[0]])];if(kind==='app')return [...any,...Object.entries(P.appTypes)];return [['*','读者打开手机后']];}
- function storyWarnings(){const warnings=[],steps=state.phone.story.steps,unlocked=new Set();steps.forEach((s,i)=>{if(i&&s.trigger==='start')warnings.push(`第 ${i+1} 步：作品开始只能作为第一步的触发，请改用读者行为。`);if(s.target!=='*'&&!storyTargets(s.trigger,i).some(([id])=>id===s.target))warnings.push(`第 ${i+1} 步：指定内容不存在，请重新选择。`);for(const action of s.actions){
+ function storyTargets(kind,index=state.phone.story.steps.length){const any=[['*','任意一项']];if(kind==='photo')return [...any,...state.phone.photos.map((_,i)=>[String(i),'照片 '+(i+1)])];if(kind==='note')return [...any,...state.phone.noteItems.map(n=>[n.id,n.title||'无标题']),...state.phone.story.steps.slice(0,index).flatMap(s=>s.actions.map((a,j)=>a.type==='note'?['story-'+s.id+'-'+j,'剧情生成：'+(a.title||'备忘录')]:null).filter(Boolean))];if(kind==='chat'||kind==='reply')return [...any,...Object.entries(P.templates).filter(([,t])=>t.kind==='chat').flatMap(([k,t])=>P.items(state,k).map(d=>[d.id,t.name+' · '+(d.roomTitle||state.partner)]))];if(kind==='like'||kind==='post')return [...any,...['instagram','x','forum'].flatMap(k=>P.items(state,k).map(d=>[d.id,P.templates[k].name+' · '+(d.title||d.body?.slice(0,15)||'帖子')]))];if(kind==='call')return [...any,...String(state.phone.calls).split('\n').filter(Boolean).map((line,i)=>[String(i),line.split('·')[0]])];if(kind==='app')return [...any,...Object.entries(P.appTypes)];return [['*','读者打开手机后']];}
+ function storyWarnings(){if(!state.phone.story.enabled)return [];const warnings=[],steps=state.phone.story.steps,unlocked=new Set();steps.forEach((s,i)=>{if(i&&s.trigger==='start')warnings.push(`第 ${i+1} 步：作品开始只能作为第一步的触发，请改用读者行为。`);if(s.target!=='*'&&!storyTargets(s.trigger,i).some(([id])=>id===s.target))warnings.push(`第 ${i+1} 步：指定内容不存在，请重新选择。`);for(const action of s.actions){
    if(['message','prepareReply'].includes(action.type)&&action.room&&!P.items(state,action.app).some(room=>room.id===action.room))warnings.push(`第 ${i+1} 步：消息的接收会话已移除，请重新选择。`);
   }
   let app=({photo:'album',note:'notes',chat:s.target,post:s.target,call:'calls',app:s.target})[s.trigger];if(app&&app!=='*'){if(!P.activeApp(state,app))warnings.push(`第 ${i+1} 步：触发应用未启用。`);else if(state.phone.apps.some(a=>(a.target||a.type)===app&&a.locked)&&!unlocked.has(app))warnings.push(`第 ${i+1} 步：需要先在前面的步骤解锁 ${P.appTypes[app]}。`);}if(s.trigger==='note'&&s.target!=='*'&&!storyTargets('note',i).some(([id])=>id===s.target))warnings.push(`第 ${i+1} 步：目标备忘录不存在，或要到后面的步骤才会生成。`);for(const a of s.actions){if(['message','prepareReply','unlock'].includes(a.type)&&!P.activeApp(state,a.app))warnings.push(`第 ${i+1} 步：结果中的 ${P.appTypes[a.app]} 未启用。`);if(a.type==='unlock')unlocked.add(a.app);if(a.type==='choice')for(const next of [a.nextA,a.nextB])if(!['next','end'].includes(next)&&!(+next>i+1&&+next<=steps.length))warnings.push(`第 ${i+1} 步：分支只能跳到后面的有效步骤。`);}if(!s.actions.length)warnings.push(`第 ${i+1} 步没有后续结果。`);if(s.actions.filter(a=>a.type==='choice').length>1||s.actions.some(a=>a.type==='choice')&&s.actions.some(a=>a.type==='ending'))warnings.push(`第 ${i+1} 步：选择与结局请分开放在不同步骤。`);});return [...new Set(warnings)];}
- function storyForm(){const story=state.phone.story;const triggerNames={start:'打开作品开始阅读',photo:'查看照片',note:'打开备忘录',chat:'进入聊天对话',like:'点赞指定帖子',post:'打开帖子详情',call:'查看通话详情',app:'打开应用',reply:'发送预写回复'};const actionNames={message:'追加聊天消息',prepareReply:'提供一条预写回复',note:'新增备忘录',unlock:'解锁应用',choice:'让读者作出选择',ending:'显示结局'};
-  let html=select('玩家提示','phone.hintsPolicy',[['off','不提供提示'],['optional','允许提示，读者点击后展开']],state.phone.hintsPolicy||'optional')+select('提示语言','phone.hintLanguage',[['editor','跟随编辑器语言'],...languages],state.phone.hintLanguage||'editor')+`<div class="story-intro"><strong>把线索串成一个故事</strong><p class="helper">最多 13 步，每步最多 3 个结果。完成一步后，下一步会等待新的读者行为；不会自动执行整条故事。</p></div>${check('启用剧情流程','phone.story.enabled',story.enabled)}<div class="actions"><button type="button" id="story-demo">载入 13 步示例</button><button type="button" id="story-add" ${story.steps.length>=13?'disabled':''}>添加步骤</button></div><p class="story-count">${story.steps.length} / 13 步</p>`;
+ function storyForm(){const story=state.phone.story;
+  const pageCount=Math.max(1,Math.ceil(story.steps.length/STORY_PAGE_SIZE));
+  storyPage=Math.min(storyPage,pageCount-1);
+  const start=storyPage*STORY_PAGE_SIZE;
+  const triggerNames={start:'打开作品开始阅读',photo:'查看照片',note:'打开备忘录',chat:'进入聊天对话',like:'点赞指定帖子',post:'打开帖子详情',call:'查看通话详情',app:'打开应用',reply:'发送预写回复'};const actionNames={message:'追加聊天消息',prepareReply:'提供一条预写回复',note:'新增备忘录',unlock:'解锁应用',choice:'让读者作出选择',ending:'显示结局'};
+  let html=select('玩家提示','phone.hintsPolicy',[['off','不提供提示'],['optional','允许提示，读者点击后展开']],state.phone.hintsPolicy||'optional')+select('提示语言','phone.hintLanguage',[['editor','跟随编辑器语言'],...languages],state.phone.hintLanguage||'editor')+`<div class="story-intro"><strong>把线索串成一个故事</strong><p class="helper">最多 ${P.Story.MAX_STEPS} 步，每步最多 3 个结果。下一步等待新的读者行为。</p></div><div class="actions"><button type="button" id="story-demo">载入 13 步示例</button><button type="button" id="story-add" ${story.steps.length>=P.Story.MAX_STEPS?'disabled':''}>添加步骤</button></div><p class="story-count">${story.steps.length} / ${P.Story.MAX_STEPS} 步</p>`;
+  if(pageCount>1){
+   const ranges=Array.from({length:pageCount},(_,page)=>`<option value="${page}" ${page===storyPage?'selected':''}>${page*STORY_PAGE_SIZE+1}–${Math.min((page+1)*STORY_PAGE_SIZE,story.steps.length)}</option>`).join('');
+   html+=`<label for="story-page">步骤范围</label><select id="story-page">${ranges}</select>`;
+  }
   html+=storyWarnings().map(w=>`<p class="story-warning">${E(w)}</p>`).join('');
-  html+=story.steps.map((s,i)=>{const base=`phone.story.steps.${i}`,jump=[['next','紧接下一步'],...story.steps.map((v,j)=>j>i?[String(j+1),`${j+1}. ${v.title}`]:null).filter(Boolean),['end','结束故事']];let body=field('步骤名称',base+'.title',s.title)+field('轻提示（只在本步骤展示）',base+'.hint',s.hint||'','textarea')+field('进一步提示',base+'.hintMore',s.hintMore||'','textarea')+`<p class="helper">${i?'前一步完成后，等待读者：':'故事开始后，等待读者：'}</p>`+select('触发行为',base+'.trigger',Object.entries(triggerNames).filter(([key])=>i===0||key!=='start'),s.trigger)+select('指定内容',base+'.target',storyTargets(s.trigger,i),s.target)+field('触发后延迟（秒，0–60）',base+'.delay',s.delay,'number');
+  html+=story.steps.slice(start,start+STORY_PAGE_SIZE).map((s,offset)=>{const i=start+offset;const base=`phone.story.steps.${i}`,jump=[['next','紧接下一步'],...story.steps.map((v,j)=>j>i?[String(j+1),`${j+1}. ${v.title}`]:null).filter(Boolean),['end','结束故事']];let body=field('步骤名称',base+'.title',s.title)+field('轻提示（只在本步骤展示）',base+'.hint',s.hint||'','textarea')+field('进一步提示',base+'.hintMore',s.hintMore||'','textarea')+`<p class="helper">${i?'前一步完成后，等待读者：':'故事开始后，等待读者：'}</p>`+select('触发行为',base+'.trigger',Object.entries(triggerNames).filter(([key])=>i===0||key!=='start'),s.trigger)+select('指定内容',base+'.target',storyTargets(s.trigger,i),s.target)+field('触发后延迟（秒，0–60）',base+'.delay',s.delay,'number');
    const clueOptions=[['','不需要额外线索'],...['photo','note','chat','post','call'].flatMap(event=>storyTargets(event,i).map(([target,name])=>[event+':'+target,triggerNames[event]+' · '+name]))];
    body+=`<details><summary>额外前置线索（可选）</summary>${select('线索一',base+'.clues.0',clueOptions,typeof s.clues?.[0]==='string'?s.clues[0]:s.clues?.[0]?s.clues[0].event+':'+s.clues[0].target:'')}${select('线索二',base+'.clues.1',clueOptions,typeof s.clues?.[1]==='string'?s.clues[1]:s.clues?.[1]?s.clues[1].event+':'+s.clues[1].target:'')}${select('线索关系',base+'.match',[['all','两条都看过'],['any','看过任意一条']],s.match)}</details><div class="story-actions"><h3>接下来发生</h3>`;
    body+=s.actions.map((a,j)=>{const ab=base+'.actions.'+j;let fields=select('结果 '+(j+1),ab+'.type',Object.entries(actionNames),a.type);if(['message','prepareReply'].includes(a.type))fields+=select('消息应用',ab+'.app',['kakao','line','imessage'].map(k=>[k,P.templates[k].name]),a.app)+select('接收会话',ab+'.room',P.items(state,['kakao','line','imessage'].includes(a.app)?a.app:'kakao').map(d=>[d.id,d.roomTitle||d.contactName||state.partner]),a.room||a.app)+(a.type==='message'?select('发送者',ab+'.who',[['partner',state.partner],['owner',state.owner]],a.who)+field('自动撤回（秒，0＝不撤回）',ab+'.withdrawAfter',a.withdrawAfter||0,'number'):'')+field(a.type==='message'?'消息正文':'预写回复正文',ab+'.text',a.text,'textarea');if(a.type==='note')fields+=field('新备忘录标题',ab+'.title',a.title)+field('新备忘录正文',ab+'.text',a.text,'textarea');if(a.type==='unlock')fields+=select('要解锁的应用',ab+'.app',Object.entries(P.appTypes),a.app)+'<p class="helper">先在「桌面应用」启用它，并勾选「开始时锁定」。</p>';if(a.type==='choice')fields+=field('选择提示',ab+'.text',a.text,'textarea')+field('选项 A',ab+'.optionA',a.optionA)+select('A 跳转到',ab+'.nextA',jump,a.nextA)+field('选项 B',ab+'.optionB',a.optionB)+select('B 跳转到',ab+'.nextB',jump,a.nextB);if(a.type==='ending')fields+=field('结局标题',ab+'.title',a.title)+field('结局正文',ab+'.text',a.text,'textarea');return `<div class="story-action">${fields}<button type="button" class="assetclear" data-remove-action="${i}:${j}">移除此结果</button></div>`;}).join('');
-   body+=`<div class="actions"><button type="button" data-add-action="${i}" ${s.actions.length>=3?'disabled':''}>添加结果</button></div></div><div class="story-controls"><button type="button" data-move-step="${i}:-1" ${i===0?'disabled':''}>上移</button><button type="button" data-move-step="${i}:1" ${i===story.steps.length-1?'disabled':''}>下移</button><button type="button" data-duplicate-step="${i}" ${story.steps.length>=13?'disabled':''}>复制步骤</button><button type="button" data-remove-step="${i}">移除此步</button></div>`;
+   body+=`<div class="actions"><button type="button" data-add-action="${i}" ${s.actions.length>=3?'disabled':''}>添加结果</button></div></div><div class="story-controls"><button type="button" data-move-step="${i}:-1" ${i===0?'disabled':''}>上移</button><button type="button" data-move-step="${i}:1" ${i===story.steps.length-1?'disabled':''}>下移</button><button type="button" data-duplicate-step="${i}" ${story.steps.length>=P.Story.MAX_STEPS?'disabled':''}>复制步骤</button><button type="button" data-remove-step="${i}">移除此步</button></div>`;
    return `<details class="story-step" data-step="${i}" ${storyOpen.has(String(i))?'open':''}><summary><span class="step-number">${i+1}</span>${E(s.title)}</summary>${body}</details>`;
   }).join('');return html+'<p class="helper">试玩时可在右侧展开「剧情试玩记录」。修改内容会重置本次试玩；导出的读者作品会在本机保存进度。分支只能向后跳转，避免死循环。</p>';
  }
@@ -181,18 +191,30 @@
   if(section==='rules')html=settingsGroup('phone-story','剧情与提示设置',storyForm());
   return html;
  }
- function renderPreview(){$('#reader-debug').hidden=state.mode!=='phone';const previous=renderedMode===state.mode&&state.mode==='phone'?player?.getView():null;player?.destroy();let template=state.mode==='screenshot'?state.template:undefined;const d=P.devices[state.device];$('#preview').style.width=d.w+10+'px';player=P.mount($('#preview'),state.mode==='screenshot'?editingState():state,{mode:state.mode,template,frame:state.frame,fitHeight:true,authorPreview:state.mode==='phone'&&section!=='appearance',hintFallback:document.documentElement.lang.split('-')[0],onProgress:showProgress});if(state.mode==='phone'&&(previewRoute||previous))player.navigate(previewRoute||previous);previewRoute=null;renderedMode=state.mode;$('#preview-title').textContent=state.mode==='screenshot'?'截图预览':'读者试玩';$('#preview-spec').textContent=`${d.name} · ${d.pixels[0]} × ${d.pixels[1]} px`;$('#reset-reader').hidden=state.mode!=='phone';$('#preview-hint').textContent=state.mode==='screenshot'?'截图只包含作品界面，不包含编辑器与设备外框。':'轻点锁屏进入；切换左侧栏目可预览桌面和备忘录。';}
+ function renderPreview(){$('#reader-debug').hidden=state.mode!=='phone'||!state.phone.story.enabled;const previous=renderedMode===state.mode&&state.mode==='phone'?player?.getView():null;player?.destroy();let template=state.mode==='screenshot'?state.template:undefined;const d=P.devices[state.device];$('#preview').style.width=d.w+10+'px';player=P.mount($('#preview'),state.mode==='screenshot'?editingState():state,{mode:state.mode,template,frame:state.frame,fitHeight:true,authorPreview:state.mode==='phone'&&section!=='appearance',hintFallback:document.documentElement.lang.split('-')[0],onProgress:showProgress});if(state.mode==='phone'&&(previewRoute||previous))player.navigate(previewRoute||previous);previewRoute=null;renderedMode=state.mode;$('#preview-title').textContent=state.mode==='screenshot'?'截图预览':'读者试玩';$('#preview-spec').textContent=`${d.name} · ${d.pixels[0]} × ${d.pixels[1]} px`;$('#reset-reader').hidden=state.mode!=='phone';$('#preview-hint').textContent=state.mode==='screenshot'?'截图只包含作品界面，不包含编辑器与设备外框。':'轻点锁屏进入；切换左侧栏目可预览桌面和备忘录。';}
  function studioLanguage(){return document.documentElement.lang.split('-')[0];}
  $('#ui-language').addEventListener('change',()=>queueMicrotask(()=>{
   const language=studioLanguage();
   if(!recoveryBlocked&&window.FicDemoLocales?.refreshPreset(state,defaults(),language)){render();scheduleSave();}
   else player?.setHintFallback(language);
  }));
- function render(){if(!state.collections)P.normalizeExtras(state,state);storyOpen=new Set([...document.querySelectorAll('.story-step[open]')].map(n=>n.dataset.step));document.querySelectorAll('[data-mode]').forEach(b=>b.setAttribute('aria-pressed',String(state.mode===b.dataset.mode)));$('#mode-caption').textContent=state.mode==='screenshot'?'选择模板，直接编辑和导出':'组合应用与线索，制作可探索的手机故事';renderNavigation();const form=$('#editor-form');
- const expanded=new Set([...form.querySelectorAll('[data-settings-group][open]')].map(group=>group.dataset.settingsGroup));
- form.innerHTML=state.mode==='screenshot'?screenshotForm():phoneForm();
- form.querySelectorAll('[data-settings-group]').forEach(group=>{group.open=expanded.has(group.dataset.settingsGroup);});
- bindForm();$('#clear-template').hidden=state.mode!=='screenshot';renderPreview();$('#exportbar').innerHTML=state.mode==='screenshot'?'<button id="batch-export">批量导出截图 ZIP</button><button class="primary" data-export="screen">导出单屏 PNG</button><button data-export="long">导出长图</button><button data-export="pages">分页导出</button>':'<button class="primary" id="export-story">导出可交互作品 HTML</button><button id="show-desktop">查看桌面</button>';$('#exportbar').querySelectorAll('[data-export]').forEach(b=>b.onclick=()=>exportPNG(b.dataset.export));if($('#batch-export'))$('#batch-export').onclick=batchExport;if($('#export-story'))$('#export-story').onclick=exportStory;if($('#show-desktop'))$('#show-desktop').onclick=()=>player.navigate('home');
+ function renderEditor(){
+  storyOpen=new Set([...document.querySelectorAll('.story-step[open]')].map(n=>n.dataset.step));
+  const form=$('#editor-form');
+  const expanded=new Set([...form.querySelectorAll('[data-settings-group][open]')].map(group=>group.dataset.settingsGroup));
+  form.innerHTML=state.mode==='screenshot'?screenshotForm():phoneForm();
+  form.querySelectorAll('[data-settings-group]').forEach(group=>{group.open=expanded.has(group.dataset.settingsGroup);});
+  bindForm();
+ }
+ function render(){
+  if(!state.collections)P.normalizeExtras(state,state);
+  const phone=state.mode==='phone',story=state.phone.story.enabled;
+  if(phone&&!story&&section==='rules')section='appearance';
+  document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(state.mode===button.dataset.mode)));
+  $('#phone-modes').hidden=!phone;
+  document.querySelectorAll('[data-phone-mode]').forEach(button=>button.setAttribute('aria-pressed',String(story===(button.dataset.phoneMode==='story'))));
+  $('#mode-caption').textContent=!phone?'选择模板，直接编辑和导出':story?'用线索触发消息、解锁应用和分支':'读者自行查看聊天、照片和备忘录';
+  renderNavigation();renderEditor();$('#clear-template').hidden=state.mode!=='screenshot';renderPreview();$('#exportbar').innerHTML=state.mode==='screenshot'?'<button id="batch-export">批量导出截图 ZIP</button><button class="primary" data-export="screen">导出单屏 PNG</button><button data-export="long">导出长图</button><button data-export="pages">分页导出</button>':'<button class="primary" id="export-story">导出可交互作品 HTML</button><button id="show-desktop">查看桌面</button>';$('#exportbar').querySelectorAll('[data-export]').forEach(b=>b.onclick=()=>exportPNG(b.dataset.export));if($('#batch-export'))$('#batch-export').onclick=batchExport;if($('#export-story'))$('#export-story').onclick=exportStory;if($('#show-desktop'))$('#show-desktop').onclick=()=>player.navigate('home');
   if(state.mode==='phone'&&window.FicPhonePublishingURL){
    const publish=document.createElement('button');
    publish.type='button';
@@ -315,9 +337,24 @@
    $('#export-summary').textContent=`已生成 ${pages.length} 张 PNG。点击缩略图保存。`;$('#export-dialog').showModal();toast('截图已生成，请在预览中选择保存。');
   }catch(e){toast('导出失败：'+e.message);}finally{capturePlayer?.destroy();host.remove();buttons.forEach(b=>b.disabled=false);}
  }
+ document.querySelectorAll('[data-phone-mode]').forEach(button=>button.onclick=()=>{
+  const enabled=button.dataset.phoneMode==='story';
+  if(enabled===state.phone.story.enabled)return;
+  state.phone.story.enabled=enabled;
+  if(enabled){
+   section='rules';
+   previewRoute='home';
+  }else if(section==='rules'){
+   section='appearance';
+   previewRoute=state.phone.lockCode?'lock':state.phone.readerStart||'lock';
+  }
+  scheduleSave();
+  render();
+  if(enabled)$('[data-settings-group="phone-story"]').open=true;
+ });
  document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{syncSheets();state.mode=b.dataset.mode;scheduleSave();render();});$('#backup').onclick=backup;$('#import').onclick=()=>$('#import-file').click();$('#import-file').onchange=e=>{if(e.target.files[0])importProject(e.target.files[0]);e.target.value='';};$('#reset-reader').onclick=()=>player.reset();$('#export-dialog').addEventListener('close',()=>{$('#export-results').querySelectorAll('a').forEach(a=>URL.revokeObjectURL(a.href));$('#export-results').innerHTML='';});window.addEventListener('pagehide',()=>{save();});
  $('#load-demo').onclick=()=>{if(!confirm('建议先导出 JSON 备份。载入 미나 × 사나 的虚构示例文本？这会替换角色名、对话、备忘录和13步剧情；保留上传图片、壁纸和机型设置。'))return;recoveryBlocked=false;applyDemo(state);scheduleSave();render();toast('已载入当前语言的 TWICE 示例。');};
- $('#editor-form').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const steps=state.phone.story.steps;let changed=false;if(b.id==='story-add'&&steps.length<13){steps.push(P.Story.normalize({steps:[{id:'s-'+Date.now(),title:'新的剧情步骤',trigger:'photo',target:'*',actions:[{type:'message',app:state.phone.chatPlatform,text:''}]}]}).steps[0]);changed=true;}if(b.id==='story-demo'){if(!confirm('用 13 步虚构示例替换当前剧情？会启用示例所需应用，并把 Instagram、X、theqoo 设为等待剧情解锁。其他文本和图片保留。'))return;state.phone.story=P.Story.demo();for(const a of state.phone.apps){if(['kakao','notes','album','calls','instagram','x','forum'].includes(a.target||a.type))a.enabled=true;a.locked=['instagram','x','forum'].includes(a.target||a.type);}changed=true;}if(b.dataset.addAction!==undefined){let step=steps[+b.dataset.addAction];if(step.actions.length<3){step.actions.push(P.Story.normalize({steps:[{actions:[{type:'message',app:state.phone.chatPlatform,text:''}]}]}).steps[0].actions[0]);changed=true;}}if(b.dataset.removeAction){const [i,j]=b.dataset.removeAction.split(':').map(Number);steps[i].actions.splice(j,1);changed=true;}if(b.dataset.removeStep!==undefined){steps.splice(+b.dataset.removeStep,1);changed=true;}if(b.dataset.duplicateStep!==undefined&&steps.length<13){const i=+b.dataset.duplicateStep,copy=JSON.parse(JSON.stringify(steps[i]));copy.id='s-'+Date.now();copy.title+='（副本）';steps.splice(i+1,0,copy);changed=true;}if(b.dataset.moveStep){const [i,delta]=b.dataset.moveStep.split(':').map(Number);if(steps[i+delta]){[steps[i],steps[i+delta]]=[steps[i+delta],steps[i]];changed=true;toast('步骤已移动，请检查分支跳转和前置线索。');}}if(changed){scheduleSave();render();}});
+ $('#editor-form').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const steps=state.phone.story.steps;let changed=false;if(b.id==='story-add'&&steps.length<P.Story.MAX_STEPS){steps.push(P.Story.normalize({steps:[{id:'s-'+Date.now(),title:'新的剧情步骤',trigger:'photo',target:'*',actions:[{type:'message',app:state.phone.chatPlatform,text:''}]}]}).steps[0]);storyPage=Math.floor((steps.length-1)/STORY_PAGE_SIZE);changed=true;}if(b.id==='story-demo'){if(!confirm('用 13 步虚构示例替换当前剧情？会启用示例所需应用，并把 Instagram、X、theqoo 设为等待剧情解锁。其他文本和图片保留。'))return;state.phone.story=P.Story.demo();storyPage=0;for(const a of state.phone.apps){if(['kakao','notes','album','calls','instagram','x','forum'].includes(a.target||a.type))a.enabled=true;a.locked=['instagram','x','forum'].includes(a.target||a.type);}changed=true;}if(b.dataset.addAction!==undefined){let step=steps[+b.dataset.addAction];if(step.actions.length<3){step.actions.push(P.Story.normalize({steps:[{actions:[{type:'message',app:state.phone.chatPlatform,text:''}]}]}).steps[0].actions[0]);changed=true;}}if(b.dataset.removeAction){const [i,j]=b.dataset.removeAction.split(':').map(Number);steps[i].actions.splice(j,1);changed=true;}if(b.dataset.removeStep!==undefined){steps.splice(+b.dataset.removeStep,1);changed=true;}if(b.dataset.duplicateStep!==undefined&&steps.length<P.Story.MAX_STEPS){const i=+b.dataset.duplicateStep,copy=JSON.parse(JSON.stringify(steps[i]));copy.id='s-'+Date.now();copy.title+='（副本）';steps.splice(i+1,0,copy);changed=true;}if(b.dataset.moveStep){const [i,delta]=b.dataset.moveStep.split(':').map(Number);if(steps[i+delta]){[steps[i],steps[i+delta]]=[steps[i+delta],steps[i]];changed=true;toast('步骤已移动，请检查分支跳转和前置线索。');}}if(changed){scheduleSave();render();}});
  const chromeObserver=new ResizeObserver(()=>{const h=['.topbar','.projectbar','.modebar','.site-footer'].reduce((sum,sel)=>sum+$(sel).getBoundingClientRect().height,0);document.documentElement.style.setProperty('--chrome-height',h+'px');});for(const sel of ['.topbar','.projectbar','.modebar','.site-footer'])chromeObserver.observe($(sel));
  $('#editor-form').addEventListener('click',e=>{const add=e.target.closest('#add-note'),remove=e.target.closest('[data-remove-note]');if(e.target.closest('#default-dock')){for(const a of state.phone.apps){a.dock=P.defaultDock.includes(a.type);if(a.dock)a.enabled=true;}previewRoute='home';scheduleSave();render();return;}if(add){if(state.phone.noteItems.length>=100)return toast('当前版本最多支持 100 篇备忘录。');state.phone.noteItems.push({id:'note-'+Date.now(),title:'新备忘录',body:'',date:'2026. 6. 6.'});previewRoute='notes';scheduleSave();render();}if(remove){state.phone.noteItems.splice(+remove.dataset.removeNote,1);previewRoute='notes';scheduleSave();render();}});
  (async()=>{try{db=await openDB();let saved=await readDB();if(saved){try{state=normalise(saved);}catch(e){throw Error('旧草稿保留：'+e.message);}}$('#save-status').textContent=saved?'已恢复本机工程':'本机自动保存';}catch(e){recoveryBlocked=true;$('#save-status').dataset.status='error';$('#save-status').textContent='旧草稿未覆盖 · 请导出或恢复';toast(e.message||'本机存储无法读取');}P.normalizeExtras(state,state);if(!recoveryBlocked)window.FicDemoLocales?.refreshPreset(state,defaults(),studioLanguage());lastHistory=JSON.stringify(state);render();initBeta();})();
@@ -349,7 +386,7 @@
  let guideSection='guide-intro';
  function guide(language='zh'){openPanel(language==='en'?'FicPhone · Step-by-step guide':'FicPhone 新手使用教程',window.FicGuide.render(language));$('#info-dialog').dataset.fixedLanguage='true';const activate=id=>{guideSection=id;$('#info-body').querySelectorAll('.guide-chapter').forEach(p=>p.hidden=p.id!==id);$('#info-body').querySelectorAll('[role="tab"]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.guideTab===id)));$('#info-body').querySelector('.guide-panel-scroll').scrollTop=0;};$('#info-body').querySelectorAll('[data-guide-tab]').forEach(b=>b.onclick=()=>activate(b.dataset.guideTab));$('#info-body').querySelectorAll('[data-guide-language]').forEach(b=>b.onclick=()=>guide(b.dataset.guideLanguage));activate(guideSection);}
 
- function feedback(){const cfg=window.FicPhoneFeedback||{},safe=v=>typeof v==='string'&&/^https:\/\//.test(v)?E(v):'';openPanel('问题与建议',`<p>当前版本：v1.0.1-beta.1</p>${safe(cfg.privateUrl)?`<p><a target="_blank" rel="noopener" href="${safe(cfg.privateUrl)}">提交私密反馈</a></p>`:'<p>私密反馈暂不可用。可复制下方问题模板，保留操作步骤与环境信息。</p>'}${safe(cfg.publicUrl)?`<p><a target="_blank" rel="noopener" href="${safe(cfg.publicUrl)}">查看公开建议板</a></p>`:'<p>公开建议板尚未接通。</p>'}<p>请勿在公开建议中填写联系方式或其他个人信息。</p><textarea readonly>版本：v1.0.1-beta.1\n反馈类型：问题 / 建议\n设备与浏览器：${E(navigator.userAgent)}\n操作步骤：\n实际结果：\n期望结果：\n是否允许公开展示建议：否</textarea>`);}
+ function feedback(){const cfg=window.FicPhoneFeedback||{},safe=v=>typeof v==='string'&&/^https:\/\//.test(v)?E(v):'';openPanel('问题与建议',`<p>当前版本：v1.0.2-beta.1</p>${safe(cfg.privateUrl)?`<p><a target="_blank" rel="noopener" href="${safe(cfg.privateUrl)}">提交私密反馈</a></p>`:'<p>私密反馈暂不可用。可复制下方问题模板，保留操作步骤与环境信息。</p>'}${safe(cfg.publicUrl)?`<p><a target="_blank" rel="noopener" href="${safe(cfg.publicUrl)}">查看公开建议板</a></p>`:'<p>公开建议板尚未接通。</p>'}<p>请勿在公开建议中填写联系方式或其他个人信息。</p><textarea readonly>版本：v1.0.2-beta.1\n反馈类型：问题 / 建议\n设备与浏览器：${E(navigator.userAgent)}\n操作步骤：\n实际结果：\n期望结果：\n是否允许公开展示建议：否</textarea>`);}
  function redoWithConfirmation(){
   if(!redoStack.length){toast('没有可恢复的操作');return;}
   const dialog=$('#redo-dialog');
@@ -401,7 +438,7 @@
   };
   $('#clear-template-cancel').focus();
  }
- function initBeta(){syncSheets();$('#privacy-notice').onclick=()=>notice('privacy');$('#copyright-notice').onclick=()=>notice('copyright');$('#backup-after-export').onclick=backup;$('#help').onclick=()=>guide();$('#projects').onclick=projects;$('#characters').onclick=characters;$('#preflight').onclick=preflight;$('#feedback').onclick=feedback;$('#feedback').hidden=!(window.FicPhoneFeedback?.privateUrl||window.FicPhoneFeedback?.publicUrl);$('#undo').onclick=()=>restoreHistory(undoStack,redoStack);$('#redo').onclick=redoWithConfirmation;$('#clear-template').onclick=clearTemplate;
+ function initBeta(){syncSheets();$('#privacy-notice').onclick=()=>notice('privacy');$('#copyright-notice').onclick=()=>notice('copyright');$('#backup-after-export').onclick=backup;$('#help').onclick=()=>guide();$('#projects').onclick=projects;$('#new-phone').onclick=chooseNewPhone;$('#characters').onclick=characters;$('#preflight').onclick=preflight;$('#feedback').onclick=feedback;$('#feedback').hidden=!(window.FicPhoneFeedback?.privateUrl||window.FicPhoneFeedback?.publicUrl);$('#undo').onclick=()=>restoreHistory(undoStack,redoStack);$('#redo').onclick=redoWithConfirmation;$('#clear-template').onclick=clearTemplate;
   document.addEventListener('keydown',event=>{
    if(!(event.ctrlKey||event.metaKey)||event.altKey||event.isComposing||event.defaultPrevented)return;
    if(event.target.closest('input,textarea,select,[contenteditable]:not([contenteditable=false]),dialog'))return;
@@ -412,7 +449,14 @@
     else restoreHistory(undoStack,redoStack);
    }
   });try{if(!localStorage.getItem('ficphone-guide-beta1')){guide();localStorage.setItem('ficphone-guide-beta1','seen');}}catch{} }
- $('#editor-form').addEventListener('change',e=>{if(e.target.id==='content-select'){contentIndex=+e.target.value;render();}});
+ $('#editor-form').addEventListener('change',e=>{
+  if(e.target.id==='story-page'){
+   storyPage=Number(e.target.value);
+   renderEditor();
+   $('#story-page').focus();
+   return;
+  }
+  if(e.target.id==='content-select'){contentIndex=+e.target.value;render();}});
  $('#editor-form').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;let changed=false;
  if(b.hasAttribute('data-sheet-add')){syncSheets();if(state.screenshotSheets.length>=9)return toast('最多九张截图稿');state.screenshotSheets.push(snapshot());state.activeSheet=state.screenshotSheets.length-1;changed=true;}
  if(b.dataset.sheet!==undefined){syncSheets();state.activeSheet=+b.dataset.sheet;const s=state.screenshotSheets[state.activeSheet];for(const k of ['template','time','battery','device','owner','partner','ownerAvatar','partnerAvatar'])state[k]=s[k];Object.assign(state.phone,s.style);state.drafts[s.template]=clone(s.draft);contentIndex=-1;changed=true;}
@@ -630,13 +674,20 @@
  $('#info-body').querySelectorAll('[data-use-character]').forEach(b=>b.onclick=()=>{const [i,role]=b.dataset.useCharacter.split(':'),c=state.characters[+i];state[role]=c.name;state[role+'Avatar']=c.avatar;for(const id of Object.keys(P.templates)){const profile=c.profiles?.[id]||{},drafts=[state.drafts[id],...(state.collections?.[id]||[])];for(const d of drafts){if(role==='owner'){d.ownerName=profile.name||c.name;d.authorAvatar=profile.avatar||c.avatar;if(P.templates[id].kind==='social'){if(profile.handle||id==='instagram'&&c.handle)d.handle=profile.handle||c.handle;if(profile.name||c.name)d.name=profile.name||c.name;}}else{d.contactName=profile.name||c.name;d.contactAvatar=profile.avatar||c.avatar;}}}scheduleSave();render();toast('角色资料已应用');});
  $('#info-body').querySelectorAll('[data-delete-character]').forEach(b=>b.onclick=()=>{state.characters.splice(+b.dataset.deleteCharacter,1);scheduleSave();characters();});}
 
- async function newBlankPhone(button){
+ function chooseNewPhone(){
+  openPanel('新建交互手机',`<p>新建时，当前工程会另存到工程库，并沿用手机外观和应用设置。</p>
+   <div class="beta-panel"><button type="button" data-new-phone="free">自由探索</button><p>放入聊天、照片和备忘录，让读者按自己的顺序探索。</p></div>
+   <div class="beta-panel"><button type="button" data-new-phone="story">剧情探索</button><p>用线索触发消息、解锁应用和分支，最多配置 99 步。</p></div>`);
+  const buttons=[...$('#info-body').querySelectorAll('[data-new-phone]')];
+  buttons.forEach(button=>button.onclick=()=>newBlankPhone(buttons,button.dataset.newPhone==='story'));
+ }
+ async function newBlankPhone(buttons,storyEnabled){
   if(!db)return toast('本机存储不可用，请先导出工程备份。');
-  if(!confirm('新建空白作品？当前工程会另存到工程库。'))return;
   const original=state;
   const snapshot=clone(syncSheets());
   const next=clone(snapshot);
   next.title='未命名作品';
+  next.mode='phone';
   next.owner='';
   next.partner='';
   next.ownerAvatar='';
@@ -647,14 +698,14 @@
   }
   for(const key of ['date','intro','notes','secret','calls','calendar','newMessage','photoCaption'])next.phone[key]='';
   for(const key of ['photos','albums','noteItems'])next.phone[key]=[];
-  next.phone.story=P.Story.normalize({enabled:false,steps:[]});
+  next.phone.story=P.Story.normalize({enabled:storyEnabled,steps:[]});
   next.phone.rule=false;
   next.phone.lockNotification='';
   next.phone.lockCode='';
   if(next.phone.homeWidgets){next.phone.homeWidgets.location='';next.phone.homeWidgets.noteId='';}
   next.screenshotSheets=[];
   next.activeSheet=0;
-  button.disabled=true;
+  buttons.forEach(button=>button.disabled=true);
   try{
    await new Promise((resolve,reject)=>{
     const transaction=db.transaction('projects','readwrite');
@@ -665,22 +716,30 @@
    });
    if(state!==original||JSON.stringify(syncSheets())!==JSON.stringify(snapshot))return toast('已备份原工程。编辑内容有变动，请再点一次新建。');
    state=next;
+   $('#info-dialog').close();
+   section=storyEnabled?'rules':'appearance';
+   storyPage=0;
+   undoStack=[];
+   redoStack=[];
+   lastHistory=JSON.stringify(state);
    recoveryBlocked=false;
    contentIndex=-1;
    previewRoute=next.phone.readerStart||'lock';
    render();
+   if(storyEnabled)$('[data-settings-group="phone-story"]').open=true;
    await save();
    if($('#save-status').dataset.status==='saved')toast('空白作品已建立，原工程已另存到工程库。');
   }catch{
    toast('无法备份原工程，请先导出 JSON。');
   }finally{
-   button.disabled=false;
+   buttons.forEach(button=>button.disabled=false);
   }
  }
  $('#version-history').onclick=()=>{
   const language=document.documentElement.lang.split('-')[0];
   const copy={
    zh:['版本日志',
+    '交互手机可在自由探索和剧情探索之间切换，已有步骤会保留。剧情上限提高到 99 步，长篇可按范围编辑，并改善了长时间探索后的续玩。',
     '首页可进入工作台或作品区。开放邀请码发布后，受邀作者可生成阅读链接，并选择是否列入公开作品区。',
     '读者可仅看手机屏幕。作品可从锁屏或桌面开始，支持指定开场通知、上滑和数字密码；编辑应用时可直接预览内容。',
     '桌面支持两页滑动、应用排序和 Dock。可添加时间日期与地点、备忘录和相册小组件。',
@@ -692,6 +751,7 @@
     '示例《雨》可切换四种语言，保留原有的 13 步与分支试玩。',
     '开放测试版，支持聊天截图和互动手机作品。'],
    en:['Changelog',
+    'Switch between free and story exploration while keeping existing steps. Stories support 99 steps, range-based editing and improved resuming after long play sessions.',
     'Open the studio or gallery from the homepage. When invite publishing is enabled, creators can share a story link and choose whether to list it publicly.',
     'Reader view can show just the screen. Start on the lock screen or home screen, choose an opening notification and set a numeric passcode. App editing can preview content directly.',
     'Swipe between two home pages, reorder apps and configure the Dock. Add time, date and location, Notes and Photos widgets.',
@@ -703,6 +763,7 @@
     'Rain is available in four languages, with the 13-step and branching demos.',
     'Public beta with chat screenshots and interactive phone stories.'],
    ko:['업데이트 기록',
+    '기존 단계를 유지하면서 자유 탐색과 스토리 탐색을 전환할 수 있습니다. 최대 99단계를 구간별로 편집할 수 있고 진행 상황 복원을 개선했습니다.',
     '홈에서 작업실이나 작품 목록으로 이동할 수 있습니다. 초대 게시가 활성화되면 초대 코드로 링크를 만들고 공개 목록에 표시할지 선택할 수 있습니다.',
     '독자 화면에 휴대전화 화면만 표시할 수 있습니다. 잠금 화면이나 홈 화면에서 시작하며 알림과 숫자 암호를 설정할 수 있습니다. 앱 편집 중에는 바로 미리 볼 수 있습니다.',
     '홈 화면 두 페이지를 넘기고 앱 순서와 Dock을 바꿀 수 있습니다. 시간·날짜·장소, 메모와 사진 위젯을 추가할 수 있습니다.',
@@ -714,6 +775,7 @@
     '예제 「비」는 네 가지 언어로 13단계 이야기와 분기를 체험할 수 있습니다.',
     '채팅 스크린샷과 인터랙티브 휴대전화 스토리를 공개 베타로 제공합니다.'],
    ja:['更新履歴',
+    '既存のステップを保持したまま自由探索とストーリー探索を切り替えられます。最大99ステップを範囲ごとに編集でき、続きからの再開を改善しました。',
     'ホームから作業画面と作品一覧を開けます。招待投稿が有効な場合は作品リンクを発行し、公開一覧に掲載するか選べます。',
     '読者には画面だけを表示できます。開始画面、最初の通知、数字のパスコードを設定できます。アプリ編集時には内容を直接プレビューできます。',
     'ホーム画面は2ページあり、アプリの順序やDockを変更できます。時刻・日付・場所、メモと写真のウィジェットを追加できます。',
@@ -725,25 +787,34 @@
     'サンプル「雨」は4言語で、13ステップと分岐を体験できます。',
     'チャット画像とインタラクティブなスマホ作品に対応した公開ベータです。']
   }[language];
-  const [title,...changes]=copy||['Changelog','Public beta'];
-  openPanel(title,`<h3>v1.0.1-beta.1</h3><ul>${changes.slice(0,-1).map(change=>`<li>${E(change)}</li>`).join('')}</ul><h3>v1.0.0-beta.1</h3><p>${E(changes.at(-1))}</p>`);
+  const [title,latest,...earlier]=copy||['Changelog'];
+  const releases=[
+   ['v1.0.2-beta.1','2026-11-08',latest?[latest]:[],true],
+   ['v1.0.1-beta.1','2026-11-07',earlier.slice(0,-1)],
+   ['v1.0.0-beta.1','2026-11-06',earlier.slice(-1)]
+  ];
+  openPanel(title,`<div class="release-list">${releases.map(([version,date,changes,open])=>`
+   <details class="release-entry"${open?' open':''}>
+    <summary><strong>${version}</strong><time datetime="${date}">${date}</time></summary>
+    <ul>${changes.map(change=>`<li>${E(change)}</li>`).join('')}</ul>
+   </details>`).join('')}</div>`);
   $('#info-dialog').dataset.fixedLanguage='';
  };
  $('#editor-form').addEventListener('click',event=>{
   const button=event.target.closest('#blank-phone');
-  if(button)newBlankPhone(button);
+  if(button)chooseNewPhone();
  });
 
  function listProjects(){if(!db)return Promise.resolve([]);return new Promise((resolve,reject)=>{const r=db.transaction('projects').objectStore('projects').getAll();r.onsuccess=()=>resolve(r.result.filter(v=>v&&v._libraryId));r.onerror=()=>reject(r.error);});}
  async function projects(){try{const list=await listProjects();openPanel('本机工程库',`<p>工程仍保存在此浏览器；清理网站数据会丢失，请另存 JSON 备份。</p><button id="project-store">将当前工程另存到工程库</button>${list.map((v,i)=>`<div class="beta-panel"><strong>${E(v.title)}</strong><p>${E(v._savedAt)}</p><button data-project-load="${i}">载入此副本</button></div>`).join('')}`);$('#project-store').onclick=()=>{if(!db)return toast('本机存储不可用');const snapshot=clone(syncSheets());snapshot._libraryId='project-'+Date.now();snapshot._savedAt=new Date().toLocaleString();const tx=db.transaction('projects','readwrite');tx.objectStore('projects').put(snapshot,snapshot._libraryId);tx.oncomplete=()=>{toast('工程副本已保存');projects();};tx.onerror=()=>toast('保存失败，请导出 JSON');};$('#info-body').querySelectorAll('[data-project-load]').forEach(b=>b.onclick=()=>{if(!confirm('载入此副本？建议先将当前工程另存副本或导出备份。'))return;state=normalise(list[+b.dataset.projectLoad]);contentIndex=-1;recoveryBlocked=false;remember();save();render();$('#info-dialog').close();});}catch(e){toast('无法读取工程库：'+e.message);}}
- function preflight(){const warnings=storyWarnings();let size=new Blob([JSON.stringify(syncSheets())]).size;for(const id of Object.keys(P.templates))for(const d of P.items(state,id)){if(P.templates[id].kind==='chat'){const names=new Set([state.owner,state.partner,'我','나','me',...(d.members||[]).map(m=>m.name)]);if(P.parse(d.script).some(m=>!names.has(m.who)))warnings.push(P.templates[id].name+' 中存在未登记的发送者，请检查成员姓名。');if(d.script?.includes('[图片]')&&!d.media&&!d.images?.length)warnings.push(P.templates[id].name+' 使用了图片占位，但未上传图片。');}}if(size>20*1024*1024)warnings.push('工程较大，建议压缩图片，并检查托管的单文件上限。');openPanel('导出前检查',`<p>工程体积约 ${(size/1024/1024).toFixed(2)} MB；导出 HTML 会额外包含播放器。</p>${warnings.length?'<ul>'+warnings.map(w=>'<li>'+E(w)+'</li>').join('')+'</ul>':'<p>未发现当前检查覆盖的问题。仍请完整试玩分支与结局；此检查不保证所有路径均可到达。</p>'}<button id="goto-rules">打开剧情设置</button>`);$('#goto-rules').onclick=()=>{syncSheets();state.mode='phone';section='rules';render();$('#info-dialog').close();};}
+ function preflight(){const warnings=storyWarnings();let size=new Blob([JSON.stringify(syncSheets())]).size;for(const id of Object.keys(P.templates))for(const d of P.items(state,id)){if(P.templates[id].kind==='chat'){const names=new Set([state.owner,state.partner,'我','나','me',...(d.members||[]).map(m=>m.name)]);if(P.parse(d.script).some(m=>!names.has(m.who)))warnings.push(P.templates[id].name+' 中存在未登记的发送者，请检查成员姓名。');if(d.script?.includes('[图片]')&&!d.media&&!d.images?.length)warnings.push(P.templates[id].name+' 使用了图片占位，但未上传图片。');}}if(size>20*1024*1024)warnings.push('工程较大，建议压缩图片，并检查托管的单文件上限。');openPanel('导出前检查',`<p>工程体积约 ${(size/1024/1024).toFixed(2)} MB；导出 HTML 会额外包含播放器。</p>${warnings.length?'<ul>'+warnings.map(w=>'<li>'+E(w)+'</li>').join('')+'</ul>':'<p>未发现当前检查覆盖的问题。仍请完整试玩分支与结局；此检查不保证所有路径均可到达。</p>'}${state.phone.story.enabled?'<button id="goto-rules">打开剧情设置</button>':''}`);const rulesButton=$('#goto-rules');if(rulesButton)rulesButton.onclick=()=>{syncSheets();state.mode='phone';section='rules';render();$('#info-dialog').close();};}
 
  function albumEditor(){state.phone.albums??=[];return `<hr class="formdivider"><h3>自定义相册</h3><p class="helper">照片可加入多个相册。删除相册只移除分组，不删除照片。</p>${state.phone.albums.map((album,i)=>`<details class="appsettings"><summary>${E(album.name||'未命名相册')} · ${album.photoIndexes.length}</summary>${field('相册名称',`phone.albums.${i}.name`,album.name)}<div class="album-photo-options">${state.phone.photos.map((src,j)=>`<label class="checkrow"><input type="checkbox" data-album-member="${i}:${j}" ${album.photoIndexes.includes(j)?'checked':''}><img src="${P.image(src)}" alt="照片 ${j+1}" width="48" height="48">${j+1}</label>`).join('')}</div><button type="button" data-remove-collection="${i}">删除此相册（保留照片）</button></details>`).join('')}<button type="button" id="album-add">新建相册</button>`;}
  $('#editor-form').addEventListener('click',e=>{if(e.target.closest('#album-add')){state.phone.albums??=[];if(state.phone.albums.length>=50)return toast('最多五十个相册');state.phone.albums.push({id:'album-'+Date.now(),name:'新相册',photoIndexes:[]});previewRoute='albums';scheduleSave();render();}const remove=e.target.closest('[data-remove-collection]');if(remove){state.phone.albums.splice(+remove.dataset.removeCollection,1);previewRoute='albums';scheduleSave();render();}});
  $('#editor-form').addEventListener('change',e=>{const value=e.target.dataset.albumMember;if(value===undefined)return;const [i,j]=value.split(':').map(Number),album=state.phone.albums[i];album.photoIndexes=e.target.checked?[...new Set([...album.photoIndexes,j])].sort((a,b)=>a-b):album.photoIndexes.filter(v=>v!==j);previewRoute='albums';scheduleSave();renderPreview();});
 
  function notice(kind){const language=document.documentElement.lang,english=!language.startsWith('zh'),t=(zh,en)=>english?en:zh;
- if(kind==='privacy')openPanel(t('隐私与数据','Privacy & data'),`<p>${t('当前版本：v1.0.1-beta.1。以下说明针对当前版本的创作编辑器。','Current version: v1.0.1-beta.1. This notice describes the current editor.')}</p><h3>${t('创作内容保存在当前浏览器','Your work stays in this browser')}</h3><p>${t('编辑器使用当前浏览器的本机存储保存工程、素材和设置。日常编辑和自动保存只使用本机存储。主动发布时上传的数据见下文。FicPhone 不提供云端备份。','The editor stores projects, media and settings in this browser’s local storage. Editing and autosave use local storage. See below for the data sent when you choose to publish. FicPhone does not provide cloud backups.')}</p><h3>${t('保存不等于备份','Saving is not a backup')}</h3><p>${t('清理网站数据、浏览器隐私模式、存储空间不足、换浏览器、设备或网址，都可能使原草稿不可用。请定期导出 JSON 工程备份，并自行保存。','Clearing site data, private browsing, storage limits, or changing browser, device or site address can make drafts unavailable. Export project JSON backups regularly and keep them safely.')}</p><h3>${t('导出与分享由你控制','You control exports and sharing')}</h3><p>${t('导出会在本机生成 PNG、ZIP、JSON 或 HTML 文件。受邀作者点击「发布」时，FicPhone 会把读者版内容和作品信息上传至发布服务，用于生成可分享链接。可编辑草稿、工程库与素材库本身保存在当前浏览器。','Export generates PNG, ZIP, JSON or HTML files on your device. When invited creators choose Publish, FicPhone sends the reader edition and its listing details to the publishing service. Editable drafts, project backups and the media library stay in the current browser.')}</p><h3>${t('访问日志与第三方链接','Hosting logs and external links')}</h3><p>${t('网站启用访问统计时，Cloudflare Web Analytics 会接收网页访问和性能指标。互动 HTML 导出不包含统计代码。GitHub Pages 也可能为安全目的记录访问者 IP。','When site analytics are enabled, Cloudflare Web Analytics receives page visit and performance metrics. Standalone HTML exports exclude analytics. GitHub Pages may also record visitor IP addresses for security.')}</p><p><a href="https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages" target="_blank" rel="noopener">GitHub Pages · Data collection</a></p>`);
+ if(kind==='privacy')openPanel(t('隐私与数据','Privacy & data'),`<p>${t('当前版本：v1.0.2-beta.1。以下说明针对当前版本的创作编辑器。','Current version: v1.0.2-beta.1. This notice describes the current editor.')}</p><h3>${t('创作内容保存在当前浏览器','Your work stays in this browser')}</h3><p>${t('编辑器使用当前浏览器的本机存储保存工程、素材和设置。日常编辑和自动保存只使用本机存储。主动发布时上传的数据见下文。FicPhone 不提供云端备份。','The editor stores projects, media and settings in this browser’s local storage. Editing and autosave use local storage. See below for the data sent when you choose to publish. FicPhone does not provide cloud backups.')}</p><h3>${t('保存不等于备份','Saving is not a backup')}</h3><p>${t('清理网站数据、浏览器隐私模式、存储空间不足、换浏览器、设备或网址，都可能使原草稿不可用。请定期导出 JSON 工程备份，并自行保存。','Clearing site data, private browsing, storage limits, or changing browser, device or site address can make drafts unavailable. Export project JSON backups regularly and keep them safely.')}</p><h3>${t('导出与分享由你控制','You control exports and sharing')}</h3><p>${t('导出会在本机生成 PNG、ZIP、JSON 或 HTML 文件。受邀作者点击「发布」时，FicPhone 会把读者版内容和作品信息上传至发布服务，用于生成可分享链接。可编辑草稿、工程库与素材库本身保存在当前浏览器。','Export generates PNG, ZIP, JSON or HTML files on your device. When invited creators choose Publish, FicPhone sends the reader edition and its listing details to the publishing service. Editable drafts, project backups and the media library stay in the current browser.')}</p><h3>${t('访问日志与第三方链接','Hosting logs and external links')}</h3><p>${t('网站启用访问统计时，Cloudflare Web Analytics 会接收网页访问和性能指标。互动 HTML 导出不包含统计代码。GitHub Pages 也可能为安全目的记录访问者 IP。','When site analytics are enabled, Cloudflare Web Analytics receives page visit and performance metrics. Standalone HTML exports exclude analytics. GitHub Pages may also record visitor IP addresses for security.')}</p><p><a href="https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages" target="_blank" rel="noopener">GitHub Pages · Data collection</a></p>`);
  else openPanel(t('版权与素材','Copyright & materials'),`<p>FicPhone · © 2026 anycolorulike</p><p>${t('FicPhone 的品牌、原创界面设计与使用文档由 anycolorulike 创作。使用、转载或修改相关内容，请遵循随附许可；未注明授权的内容请先联系作者。','FicPhone branding, original interface design and documentation are by anycolorulike. Reuse and modifications are subject to the accompanying licenses; contact the author for materials without stated permission.')}</p><h3>${t('第三方素材分别适用其权利与许可','Third-party materials retain their own terms')}</h3><p>${t('平台名称、商标、应用图标、人物照片和第三方代码、字体不因出现在 FicPhone 中而归工具作者所有。四款新增字体按 SIL Open Font License 提供，许可说明随网站与使用这些字体的 HTML 导出保留。','Platform names, trademarks, app icons, photographs, third-party code and fonts are not owned by the tool author merely because they appear here. The four added fonts use the SIL Open Font License; notices are included with the site and HTML exports using them.')}</p><p>${t('示例人物照片仅用于展示创作效果，相关权利归原权利人所有。','Sample photographs demonstrate creative features. Their respective rights remain with their rights holders.')}</p><h3>${t('作者创作的作品','Creators’ works')}</h3><p>${t('使用 FicPhone 不会把你的故事、文字或原创素材转让给工具作者。本说明也不替你获得所用第三方素材的授权。','Using FicPhone does not transfer your story, writing or original materials to the tool author. This notice does not grant rights in third-party materials you choose to use.')}</p>`);}
 
 })();
