@@ -1,17 +1,15 @@
-<img width="1572" height="428" alt="image" src="https://github.com/user-attachments/assets/42722489-e067-4a4f-a58c-b3fd8edddbc4" />
-
 # FicPhone · Found-phone story maker and chat screenshot editor
 
 Create interactive found-phone stories, K-pop fanfiction and social media AUs in your browser. Readers can open apps, explore conversations, browse photos and follow clues through a fictional phone. You can also create standalone chat, social media and forum screenshots.
 
 **[Open FicPhone Studio](https://anycolorulike-l.github.io/ficphone/studio.html)** · [Play the demo](https://anycolorulike-l.github.io/ficphone/demo.html) · [中文操作指南](README.zh-CN.md)
 
-Current version: `v1.0.1-beta.1`. Free to use. The editor runs in your browser and requires no account. Desktop browsers give you the most room to edit and preview. Open **User guide** in the editor for illustrated steps in English and Chinese.
+Current version: `v1.0.2-beta.1`. Free to use. The editor runs in your browser and requires no account. Desktop browsers give you the most room to edit and preview. Open **User guide** in the editor for illustrated steps in English and Chinese.
 
 | Mode | What you can make |
 | --- | --- |
 | Screenshots | KakaoTalk, LINE, Messages / iMessage, Instagram, X and theqoo templates. Set different times and content for up to nine drafts and export them together as PNGs in a ZIP. |
-| Interactive phone | A fictional phone with chats, posts, albums, notes and call history. Set up to 13 story steps and export a standalone HTML file. |
+| Interactive phone | A fictional phone with chats, posts, albums, notes and call history. Let readers explore freely, or add up to 99 story steps. Export a standalone HTML file. |
 
 The [FicPhone homepage](https://anycolorulike-l.github.io/ficphone/) links to the studio and the [interactive stories gallery](https://anycolorulike-l.github.io/ficphone/works.html). The editor supports Chinese, English, Korean and Japanese. Phone and hint languages can be set separately.
 
@@ -23,7 +21,7 @@ The [FicPhone homepage](https://anycolorulike-l.github.io/ficphone/) links to th
 
 ## Make an interactive phone
 
-1. Select **Interactive phone**. In **Phone appearance**, choose a device, set the wallpapers, and choose whether the story starts on the lock screen or home screen. Select **Screen only** for a borderless reader view. An optional four- or six-digit passcode gives readers a keypad on the lock screen.
+1. Click **New interactive phone** and choose **Free exploration** or **Story exploration**. Use **Reading mode** to switch within the same project and keep your existing steps. In **Phone appearance**, choose a device, set the wallpapers, and choose whether the story starts on the lock screen or home screen. Select **Screen only** for a borderless reader view. An optional four- or six-digit passcode gives readers a keypad on the lock screen.
 2. Under **Home screen apps**, enable the apps readers should find, assign them to one of two pages, and configure the Dock and first-page widgets. Add conversations and posts under **App content**, and add your photos and notes under **Albums & notes**.
 3. In **Story triggers**, connect reader actions to new messages, notes, app unlocks, choices or endings. For a message, select the app and destination conversation. You can set a withdrawal delay, offer a scripted reply or configure the hint language here.
 4. Play through the story in the preview, then choose **Export interactive HTML**. Readers can open that file in a browser.
