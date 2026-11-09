@@ -301,6 +301,46 @@ GitHub Pages guide|GitHub Pages 안내|GitHub Pages案内
 Projects remain in this browser. Clearing site data removes them; keep JSON backups.|프로젝트는 이 브라우저에 저장됩니다. 사이트 데이터를 지우면 사라지므로 JSON을 백업하세요.|プロジェクトはこのブラウザ内に保存されます。サイトデータを消すと失われるためJSONを保存してください。
 Characters are included in JSON backups. Applying a character updates names, avatars and username; it does not rewrite story text.|캐릭터는 JSON 백업에 포함됩니다. 적용하면 이름, 프로필 사진, 계정만 바뀌며 이야기 본문은 바뀌지 않습니다.|キャラクターはJSONに含まれます。適用すると名前・アイコン・アカウントのみ変わり、本文は書き換えません。
 No issues found by the current checks. Test every branch and ending; this check does not prove all paths are reachable.|현재 점검 범위에서 문제를 찾지 못했습니다. 모든 분기와 엔딩을 직접 테스트하세요. 모든 경로의 도달 가능성을 보장하지는 않습니다.|現在のチェックでは問題が見つかりませんでした。各分岐と結末を試してください。すべての経路に到達できる保証ではありません。
+Save name|이름 저장|名前を保存
+Cancel|취소|キャンセル
+Current screenshot sheet|현재 스크린샷|編集中のスクリーンショット
+Manage screenshot sheets|스크린샷 관리|スクリーンショットの管理
+Ungrouped|미분류|未分類
+This group is empty.|이 그룹에는 스크린샷이 없습니다.|このグループにスクリーンショットはありません。
+Export group|그룹 내보내기|グループを出力
+Rename group|그룹 이름 변경|グループ名を変更
+Move group up|그룹 위로|グループを上へ
+Move group down|그룹 아래로|グループを下へ
+Remove group|그룹 삭제|グループを削除
+New group|새 그룹|新規グループ
+Export selected sheets|선택한 스크린샷 내보내기|選択したスクリーンショットを出力
+Current sheet|현재 작업|編集中
+Rename|이름 변경|名前を変更
+Sheet group|소속 그룹|所属グループ
+Message grouping|메시지 묶음|メッセージのまとめ方
+Automatic|자동|自動
+Start a new group|새 메시지 묶음 시작|新しいまとまりを開始
+Continue the previous group|이전 묶음에 이어서 표시|前のまとまりに続ける
+Each sheet has its own content and time. Select sheets to export them together.|스크린샷마다 내용과 시간이 다릅니다. 선택한 스크린샷을 한 번에 내보낼 수 있습니다.|内容と時刻はスクリーンショットごとに保存されます。選択したものをまとめて出力できます。
+Calendar opening date (optional)|캘린더 시작 날짜 (선택)|カレンダーの開始日（任意）
+Leave blank to open on the first dated event. Undated events appear on the opening date.|비워 두면 날짜가 있는 첫 일정에서 열립니다. 날짜가 없는 일정은 시작 날짜에 표시됩니다.|空欄の場合は日付付きの最初の予定を開きます。日付のない予定は開始日に表示されます。
+One call per line. Add an optional date at the start, e.g. 2026-06-07 · Sana · 22:48 · Missed call.|한 줄에 통화 한 건을 입력하세요. 날짜는 앞에 추가할 수 있습니다. 예: 2026-06-07 · 사나 · 22:48 · 부재중 전화.|1行に1件の通話を入力します。先頭に日付を付けられます。例 2026-06-07 · Sana · 22:48 · 不在着信。
+One event per line. Add an optional date at the start, e.g. 2026-06-08 · 09:00 · Dance practice.|한 줄에 일정 하나를 입력하세요. 날짜는 앞에 추가할 수 있습니다. 예: 2026-06-08 · 09:00 · 안무 연습.|1行に1件の予定を入力します。先頭に日付を付けられます。例 2026-06-08 · 09:00 · ダンス練習。
+Conversation details|대화 정보|トーク情報
+Contact avatar for this conversation|이 대화의 상대방 프로필 사진|このトークの相手のアイコン
+Default contact avatar|기본 상대방 프로필 사진|相手の既定アイコン
+Add photo message|사진 메시지 추가|画像メッセージを追加
+Add voice message|음성 메시지 추가|音声メッセージを追加
+Photo group|사진 묶음|画像のまとめ
+Use [图片] on its own to insert this entire group. To send one photo, add a photo message.|스크립트에서 [图片]만 쓰면 사진 묶음 전체가 들어갑니다. 한 장만 보낼 때는 사진 메시지를 추가하세요.|スクリプトに [图片] だけを書くと、まとめた画像がすべて入ります。1枚だけ送る場合は画像メッセージを追加してください。
+Enter Name: message on each line. Use Name: [23:08] message to set the time. 我 stands for the phone owner.|한 줄마다 이름: 메시지를 입력하세요. 시간은 이름: [23:08] 메시지로 설정합니다. 我는 휴대폰 주인입니다.|1行に「名前：メッセージ」を入力します。「名前：[23:08] メッセージ」で時刻を設定できます。「我」はスマートフォンの持ち主です。
+Message time (optional)|메시지 시간 (선택)|メッセージの時刻（任意）
+Choose photo|사진 선택|画像を選択
+Upload audio (optional)|음성 업로드 (선택)|音声をアップロード（任意）
+Displayed duration (seconds)|표시할 길이 (초)|表示する長さ（秒）
+Uploaded audio supplies its duration automatically. Enter a duration alone to make a static voice bubble.|오디오를 올리면 길이를 자동으로 읽습니다. 정적 음성 말풍선만 만들려면 길이만 입력하세요.|音声をアップロードすると長さを自動で取得します。静止画用の音声吹き出しは長さだけで作成できます。
+Add message|메시지 추가|メッセージを追加
+Upload audio or enter a duration.|음성을 올리거나 길이를 입력하세요.|音声をアップロードするか、長さを入力してください。
 `;
 for(const row of rows.trim().split('\n')){const [en,ko,ja]=row.split('|');if(en&&ko&&ja){window.FicPhoneLocales.ko[en]=ko;window.FicPhoneLocales.ja[en]=ja;}}
 })();

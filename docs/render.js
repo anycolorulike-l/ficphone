@@ -37,14 +37,14 @@ function PocketRuntime(StoryFactory) {
  function appName(app,phone={}){const lang=appNames[app.language]?app.language:appNames[phone.language]?phone.language:'ko';return String(app.name||'').trim()||(appNames[lang][app.type]||'App');}
  function activeApp(state,type){return (state.phone.apps||[]).some(a=>a.enabled&&(a.target||a.type)===type);}
  function batteryState(value,mode='normal'){const level=Math.max(0,Math.min(100,Math.round(Number(value)||0)));const status=mode==='charging'?'charging':mode==='lowPower'?'lowPower':level<=20?'low':'normal';return {level,status,fill:22*level/100,color:status==='charging'?'#34c759':status==='lowPower'?'#ffd60a':status==='low'?'#ff453a':'currentColor'};}
- function readerState(state){const s=JSON.parse(JSON.stringify(state));delete s.characters;delete s.screenshotSheets;delete s.activeSheet;delete s.assetLibrary;if(!s.phone.embedFont||s.phone.font!=='custom')s.phone.customFont='';for(const id of Object.keys(s.collections||{}))if(!activeApp(s,id))s.collections[id]=[];if(s.phone.story)for(const step of s.phone.story.steps||[])for(const a of step.actions||[]){if(['message','prepareReply'].includes(a.type)&&!activeApp(s,a.app))a.text='';if(a.type==='note'&&!activeApp(s,'notes')){a.title='';a.text='';}}for(const id of Object.keys(templates))if(!activeApp(s,id))for(const key of Object.keys(s.drafts[id]||{}))s.drafts[id][key]=typeof s.drafts[id][key]==='boolean'?false:'';if(!activeApp(s,s.phone.chatPlatform))s.phone.newMessage='';for(const id of ['kakao','line','imessage']){
+ function readerState(state){const s=JSON.parse(JSON.stringify(state));delete s.characters;delete s.screenshotSheets;delete s.screenshotGroups;delete s.activeSheet;delete s.assetLibrary;if(!s.phone.embedFont||s.phone.font!=='custom')s.phone.customFont='';for(const id of Object.keys(s.collections||{}))if(!activeApp(s,id))s.collections[id]=[];if(s.phone.story)for(const step of s.phone.story.steps||[])for(const a of step.actions||[]){if(['message','prepareReply'].includes(a.type)&&!activeApp(s,a.app))a.text='';if(a.type==='note'&&!activeApp(s,'notes')){a.title='';a.text='';}}for(const id of Object.keys(templates))if(!activeApp(s,id))for(const key of Object.keys(s.drafts[id]||{}))s.drafts[id][key]=typeof s.drafts[id][key]==='boolean'?false:'';if(!activeApp(s,s.phone.chatPlatform))s.phone.newMessage='';for(const id of ['kakao','line','imessage']){
    for(const draft of [s.drafts[id],...(s.collections?.[id]||[])]){
     if(Array.isArray(draft?.attachments)){
      draft.attachments=draft.attachments.filter(asset=>String(draft.script||'').includes('[附件-'+asset.id+']'));
     }
    }
   }
-  if(!activeApp(s,'album')){s.phone.photos=[];s.phone.albums=[];}if(!activeApp(s,'notes')){s.phone.noteItems=[];s.phone.notes='';s.phone.secret='';}for(const id of ['calls','calendar'])if(!activeApp(s,id))s.phone[id]='';return s;}
+  if(!activeApp(s,'album')){s.phone.photos=[];s.phone.albums=[];}if(!activeApp(s,'notes')){s.phone.noteItems=[];s.phone.notes='';s.phone.secret='';}for(const id of ['calls','calendar'])if(!activeApp(s,id))s.phone[id]='';if(!activeApp(s,'calendar'))delete s.phone.calendarDate;return s;}
  const paths={back:'M15 5l-7 7 7 7',search:'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14M15 15l6 6',menu:'M4 6h16M4 12h16M4 18h16',plus:'M12 4v16M4 12h16',smile:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20M7 14q5 6 10 0M8 8h.01M16 8h.01',hash:'M9 3L7 21M17 3l-2 18M3 8h18M2 16h18',phone:'M5 3l4 4-2 3q2 5 7 7l3-2 4 4q-2 5-7 2Q3 16 2 7q0-4 3-4',camera:'M3 7h4l2-3h6l2 3h4v14H3zM12 10a4 4 0 1 0 0 8 4 4 0 0 0 0-8',user:'M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8M4 22v-3a8 8 0 0 1 16 0v3',chat:'M3 3h18v14H9l-6 4z',more:'M4 12h.01M12 12h.01M20 12h.01',heart:'M12 21L3 12C-3 4 8-2 12 6c4-8 15-2 9 6z',comment:'M3 3h18v14H9l-6 4z',share:'M3 10L22 2l-7 20-4-9zM11 13L22 2',bookmark:'M6 3h12v19l-6-4-6 4z',repeat:'M3 8l4-4 4 4M7 4v12h9M21 16l-4 4-4-4M17 20V8H8',arrow:'M12 20V4M5 11l7-7 7 7',wifi:'M2 8q10-9 20 0M5 12q7-6 14 0M9 16q3-3 6 0M12 20h.01',signal:'M4 20v-4M9 20v-8M14 20V8M19 20V4',home:'M3 11l9-8 9 8M5 10v11h14V10',grid:'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',bell:'M5 16V9a7 7 0 0 1 14 0v7l2 3H3zM10 22h4',lock:'M6 10V7a6 6 0 0 1 12 0v3M4 10h16v12H4z',note:'M4 3h16v18H4zM7 8h10M7 12h10M7 16h6'};
  const icon=(name,cls='')=>`<svg class="pi ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name]||paths.grid}"/></svg>`;
  paths.mic='M9 4a3 3 0 0 1 6 0v8a3 3 0 0 1-6 0zM6 10v2a6 6 0 0 0 12 0v-2M12 18v4M8 22h8';
@@ -59,7 +59,7 @@ function PocketRuntime(StoryFactory) {
 .pocket-device .story-reply{margin:4px 10px;padding:8px;text-align:left;border:1px solid #abbbe1;border-radius:10px;background:#eef3ff;flex:none}.pocket-device .story-reply span{color:#1849a3;font-size:12px}
 .pocket-device .unsent-draft{flex:1;min-width:0;color:#20242b;white-space:pre-wrap;overflow-wrap:anywhere;overflow:auto;max-height:100%;text-align:left}.pocket-device .inputshape:has(.unsent-draft){height:auto;min-height:36px;max-height:92px}.pocket-device .compose:has(.unsent-draft){height:auto;min-height:53px}.pocket-device .comment-row p{white-space:pre-wrap;overflow-wrap:anywhere}
 .pocket-device .thread-reply{margin-left:20px;border-left:2px solid #e3e7ef;padding-left:10px}
-.pocket-device .voice-message{display:block;width:180px;max-width:100%;height:35px}.pocket-device .voice-label{white-space:nowrap}
+.pocket-device .voice-message{display:none}
 .pocket-device .work-watermark{position:absolute;bottom:38px;right:12px;padding:3px 7px;border-radius:5px;background:#fff9;color:#333b;font:11px/1.5 -apple-system,sans-serif;z-index:7;pointer-events:none;max-width:70%;overflow-wrap:anywhere}
 
 .pocket-device .bubble,.pocket-device .tweet-body,.pocket-device .post-copy,.pocket-device .notepaper,.pocket-device .qoo-body,.pocket-device .qoo-comment p,.pocket-device .comment-row p,.pocket-device .feed-tweet-body,.pocket-device .unsent-draft{font-family:var(--work-font)!important;font-size:var(--work-size)!important}.pocket-device .media-carousel{display:flex;overflow-x:auto;scroll-snap-type:x mandatory}.pocket-device .media-carousel>.postmedia{flex:0 0 100%;min-width:100%;scroll-snap-align:start}.pocket-device .typing-bubble{display:flex;gap:5px;padding:12px;background:#9aaab3;border-radius:15px;width:max-content;margin:12px}.pocket-device .typing-bubble i{width:5px;height:5px;border-radius:50%;background:#fee500;animation:typing-dot 1s infinite alternate}.pocket-device .typing-bubble i:nth-child(2){animation-delay:.2s}.pocket-device .typing-bubble i:nth-child(3){animation-delay:.4s}.pocket-device.imessage .typing-bubble{background:#e9e9eb}.pocket-device.imessage .typing-bubble i{background:#888}.pocket-device.line .typing-bubble i{background:#fff}.pocket-device .item-picker{display:flex;gap:6px;overflow:auto;flex:none;padding:8px}.pocket-device .item-picker button{padding:6px 10px;background:#f1f4fa;border-radius:10px;font-size:12px;white-space:nowrap}.pocket-device [data-like][aria-pressed=true]{color:#ed375c}.pocket-fit + .reader-hints{z-index:8;font:12px/1.6 -apple-system,BlinkMacSystemFont,sans-serif;width:max-content;max-width:min(320px,100%);max-height:min(60dvh,420px);overflow:auto;flex-shrink:0;text-align:left;color:#002fa7}.pocket-fit + .reader-hints>button,.pocket-fit + .reader-hints>div{background:rgba(255,255,255,.78);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#002fa7;padding:10px 12px;border:1px solid #ffffffa0;border-radius:12px;box-shadow:0 2px 12px #0002}.pocket-fit + .reader-hints>button{display:block;margin-left:auto}.pocket-fit + .reader-hints button{font:inherit;cursor:pointer}.pocket-fit + .reader-hints>div{white-space:pre-wrap;margin-top:6px;max-width:300px;overflow-wrap:anywhere}.pocket-fit + .reader-hints>div button{display:block;margin-top:10px;font-size:11px;border:1px solid #dce3f1;border-radius:7px;background:#edf2ff;color:#002fa7;padding:6px 9px}.pocket-fit + .reader-hints [data-hints]{touch-action:none}.pocket-fit + .reader-hints .hint-drag{display:flex;align-items:center;gap:6px;cursor:grab;touch-action:none;user-select:none;color:#536780;font-size:11px;border-bottom:1px solid #53678025;padding:0 0 6px;margin-bottom:7px}.pocket-fit + .reader-hints .hint-drag:active{cursor:grabbing}.pocket-fit + .reader-hints .hint-drag:focus-visible{outline:2px solid #002fa7}.pocket-fit + .reader-hints .hint-step{display:block;color:#657087;font-size:11px;margin-bottom:6px}@keyframes typing-dot{to{opacity:.25;transform:translateY(-3px)}}@media(prefers-reduced-motion:reduce){.pocket-device .typing-bubble i{animation:none}}
@@ -207,6 +207,7 @@ function PocketRuntime(StoryFactory) {
 .pocket-device .callrow .pi{color:#a4a4aa;width:18px;height:18px}.pocket-device .callrow .calltext{padding:11px 0;border-bottom:1px solid #e9e9ed;flex:1;min-width:0}
 .pocket-device .callrow strong{font-size:17px;font-weight:600}.pocket-device .callrow.missed strong{color:#ff3b30}
 .pocket-device .callrow small{display:block;color:#909095;font-size:13px;margin-top:3px}.pocket-device .callrow time{font-size:13px;color:#96969b}
+.pocket-device .callrow time{text-align:right}.pocket-device .callrow time small{font-size:11px;margin-top:1px}
 .pocket-device .callrow .info{width:20px;height:20px;display:grid;place-items:center;border:1.5px solid #007aff;color:#007aff;border-radius:50%;font-size:12px;margin-left:4px}
 .pocket-device .contact-detail{background:#f2f2f7;flex:1;padding:25px 17px}.pocket-device .contact-detail .avatar{margin:0 auto;width:80px;height:80px;border-radius:50%}
 .pocket-device .contact-detail h2{font-size:26px;text-align:center;font-weight:500;margin:15px 0 25px}.pocket-device .contact-card{background:#fff;border-radius:12px;padding:17px;white-space:pre-wrap;font-size:15px}
@@ -215,7 +216,10 @@ function PocketRuntime(StoryFactory) {
 .pocket-device .calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);padding:0 15px 12px;gap:4px 1px;text-align:center}
 .pocket-device .calendar-grid span,.pocket-device .calendar-grid button{height:35px;display:grid;place-items:center;font-size:18px}
 .pocket-device .calendar-grid .weekday{font-size:11px;height:22px;color:#909095}.pocket-device .calendar-grid button.selected{background:#ff3b30;color:#fff;border-radius:50%;width:34px;margin:auto}
-.pocket-device .calendar-grid button:nth-child(7n+1){color:#ff3b30}.pocket-device .calendar-grid button.selected{color:#fff}
+.pocket-device .calendar-head .calendar-nav{display:flex;gap:10px}.pocket-device .calendar-nav button{min-width:30px;font-size:24px;line-height:1}
+.pocket-device .calendar-grid button:nth-child(7n+1){color:#ff3b30}.pocket-device .calendar-grid button{position:relative}.pocket-device .calendar-grid button.selected{color:#fff}
+.pocket-device .calendar-grid button.has-events::after{content:'';position:absolute;bottom:2px;width:4px;height:4px;border-radius:50%;background:#ff3b30}
+.pocket-device .calendar-grid button.selected::after{background:currentColor}
 .pocket-device .event-list{padding:15px 18px;border-top:1px solid #e8e8ed;overflow:auto;flex:1}.pocket-device .event-date{font-size:14px;font-weight:600;margin-bottom:16px}
 .pocket-device .event-row{display:flex;gap:15px;margin:0 0 18px;font-size:14px;align-items:stretch}.pocket-device .event-row time{width:46px;color:#777;font-size:12px;text-align:right;flex:none;padding-top:3px}
 .pocket-device .event-row div{padding:2px 0 2px 11px;border-left:3px solid #ab72cc;flex:1;font-weight:500}
@@ -277,9 +281,32 @@ function PocketRuntime(StoryFactory) {
 .pocket-device .listroom .roomcopy{font-size:calc(var(--work-size) * 1.07)}
 .pocket-device .feed-tweet-author,.pocket-device .ig-storystrip > div{font-size:calc(var(--work-size) * .93)}
 
+.pocket-device .msg .bubble.photo-bubble{background:transparent;padding:0;border-radius:10px;overflow:hidden}
+.pocket-device .msg .bubble.photo-bubble::before{display:none}
+.pocket-device .photo-bubble .chat-photo{display:block;width:auto;max-width:min(100%,220px);max-height:270px;object-fit:contain;border-radius:inherit}
+.pocket-device .photo-bubble .chat-photo+.chat-photo{margin-top:4px}
+.pocket-device.line .msg .bubble.photo-bubble{border-radius:12px}
+.pocket-device.imessage .msg .bubble.photo-bubble,.pocket-device.samsungmessages .msg .bubble.photo-bubble{border-radius:18px}
+.pocket-device .voice-card{display:flex;align-items:center;gap:9px;white-space:nowrap;font:500 12px/1.2 system-ui,sans-serif}
+.pocket-device .voice-play{display:grid;place-items:center;flex:none;width:29px;height:29px;border-radius:50%;background:#0000000f}
+.pocket-device .voice-play svg{width:13px;height:13px}
+.pocket-device .voice-pause,.pocket-device .voice-play[aria-pressed=true] .voice-triangle{display:none}
+.pocket-device .voice-play[aria-pressed=true] .voice-pause{display:block}
+.pocket-device .voice-card time{font-variant-numeric:tabular-nums}
+.pocket-device .voice-track{width:70px;height:4px;border-radius:2px;background:currentColor;opacity:.28}
+.pocket-device .voice-wave{width:88px;height:22px;opacity:.76}
+.pocket-device.imessage .voice-play{background:#007aff;color:white}
+.pocket-device.imessage .mine .voice-play{background:white;color:#007aff}
+.pocket-device.line .voice-play,.pocket-device.kakao .voice-play{background:none}
+.pocket-device.kakao .msg .voice-bubble{background:#fff;color:#242424;border-radius:16px}
+.pocket-device.kakao .voice-bubble::before{display:none}
+.pocket-device.kakao .voice-card{justify-content:space-between;min-width:124px}
+.pocket-device.kakao .voice-card time{font-size:14px}
+.pocket-device .voice-caption,.pocket-device .chat-image-caption{display:block;margin-bottom:5px}
 `;
  function ensureStyle(){if(typeof PocketFontData!=='undefined'&&!document.getElementById('pocket-fonts')){const style=document.createElement('style');style.id='pocket-fonts';style.textContent=Object.entries(fontCatalog).map(([id,f])=>/^data:.*;base64,[A-Za-z0-9+/=]+$/.test(PocketFontData[id]||'')?`@font-face{font-family:${f.family};src:url('${PocketFontData[id]}') format('woff2');font-weight:400;font-style:normal;font-display:swap;}`:'').join('');document.head.append(style);}if(!document.getElementById('pocket-runtime-css')){const style=document.createElement('style');style.id='pocket-runtime-css';style.textContent=css;document.head.append(style);}}
  function avatar(src,round=false){return `<div class="avatar ${round?'round':''}">${image(src)?`<img src="${image(src)}" alt="头像">`:icon('user')}</div>`;}
+ const MAX_SCREENSHOT_SHEETS=37;
  function parse(script){return String(script||'').split('\n').filter(s=>s.trim()).map(line=>{const at=line.indexOf('：')>=0?line.indexOf('：'):line.indexOf(':');return at>0?{who:line.slice(0,at).trim(),text:line.slice(at+1).trim()}:{who:'我',text:line};});}
  function noteItems(state,unlocked=false){
   const phone=state.phone,items=Array.isArray(phone.noteItems)?phone.noteItems:[{id:'legacy',title:String(phone.notes||'').split('\n')[0]||'메모',body:String(phone.notes||'').split('\n').slice(1).join('\n').trim(),date:'2026. 6. 6.'}];
@@ -302,10 +329,28 @@ function PocketRuntime(StoryFactory) {
  function audio(value){
   return typeof value==='string'&&value.length<=2800000&&/^data:audio\/(mpeg|mp4|ogg|wav|webm);base64,[A-Za-z0-9+/]+={0,2}$/.test(value)?value:'';
  }
+ function voiceSeconds(value){
+  return Number.isInteger(value)&&value>0&&value<=3599?value:0;
+ }
+ function voiceTime(seconds,padded){
+  return seconds?String(Math.floor(seconds/60)).padStart(padded?2:1,'0')+':'+String(seconds%60).padStart(2,'0'):'–:––';
+ }
+ function cleanAttachments(values){
+  if(!Array.isArray(values))return [];
+  return values.slice(0,60).flatMap(asset=>{
+   const id=String(asset?.id||'');
+   if(!/^[a-z0-9-]{1,50}$/.test(id))return [];
+   const photo=image(asset?.src),recording=audio(asset?.src),duration=voiceSeconds(asset?.duration);
+   if(photo)return [{id,src:photo}];
+   return recording||duration?[{id,src:recording,...(duration?{duration}:{})}]:[];
+  });
+ }
  function splitMessage(message){
   const match=message.text.match(/^\[([^\]]+)\]\s*/);
-  const timed=match&&match[1]!=='图片'&&!match[1].startsWith('附件-');
-  return timed?{...message,time:match[1],text:message.text.slice(match[0].length)}:message;
+  const timed=match&&match[1]!=='图片'&&!match[1].startsWith('附件-')&&!match[1].startsWith('分组-');
+  const text=timed?message.text.slice(match[0].length):message.text;
+  const group=text.match(/^\[分组-(另起|接续)\]\s*/);
+  return {...message,...(timed?{time:match[1]}:{}),...(group?{group:group[1]}:{}),text:group?text.slice(group[0].length):text};
  }
  function cleanComments(input){
   if(!Array.isArray(input))return [];
@@ -333,14 +378,51 @@ function PocketRuntime(StoryFactory) {
   }
   return comments.map(comment=>({...comment,text:comment.text.trimEnd()}));
  }
- function cleanDraft(raw,base={}){const d={...base};for(const [k,v] of Object.entries(raw||{})){if(['__proto__','constructor','prototype'].includes(k))continue;if(['media','authorAvatar','contactAvatar'].includes(k))d[k]=image(v);else if(k==='images')d.images=Array.isArray(v)?v.slice(0,9).map(image).filter(Boolean):[];else if(k==='attachments')d.attachments=(Array.isArray(v)?v:[]).slice(0,60).map(a=>({id:String(a?.id||''),src:image(a?.src)||audio(a?.src)})).filter(a=>/^[a-z0-9-]{1,50}$/.test(a.id)&&a.src);else if(k==='commentItems')d.commentItems=cleanComments(v);else if(k==='members')d.members=Array.isArray(v)?v.slice(0,7).map(m=>({name:String(m.name||'').slice(0,80),avatar:image(m.avatar),readUntil:Math.max(0,Number(m.readUntil)||0)})):[];else if(['typing','unread','animateDraft'].includes(k))d[k]=!!v;else if(['unreadFrom','incomingUnread'].includes(k))d[k]=Math.max(0,Number(v)||0);else if(typeof v==='string')d[k]=v.slice(0,100000);}return d;}
- function normalizeExtras(raw,fresh){if(raw===fresh)raw=JSON.parse(JSON.stringify(raw));if((raw.betaSchema||0)>1)throw Error('此工程来自更新版本，请先升级 FicPhone。');if((raw.screenshotSheets?.length||0)>9)throw Error('当前最多九张截图稿，原工程未改动。');for(const id of Object.keys(templates)){if((raw.collections?.[id]?.length||0)>49)throw Error('当前每平台最多五十项内容，原工程未改动。');for(const d of [raw.drafts?.[id],...(Array.isArray(raw.collections?.[id])?raw.collections[id]:[])])if((d?.images?.length||0)>9)throw Error('每条内容最多九张图片，原工程未改动。');}fresh.betaSchema=1;fresh.assetLibrary=Array.isArray(raw.assetLibrary)?raw.assetLibrary.slice(0,40).map(asset=>({name:String(asset?.name||'').slice(0,100),src:image(asset?.src)})).filter(asset=>asset.src):[];fresh.characters=Array.isArray(raw.characters)?raw.characters.slice(0,50).map(c=>({name:String(c.name||'').slice(0,80),handle:String(c.handle||'').slice(0,100),avatar:image(c.avatar),profiles:Object.fromEntries(Object.keys(templates).map(id=>[id,{name:String(c.profiles?.[id]?.name||'').slice(0,80),handle:String(c.profiles?.[id]?.handle||(id==='instagram'?c.handle||'':'')).slice(0,100),avatar:image(c.profiles?.[id]?.avatar)}]))})):[];fresh.collections={};for(const id of Object.keys(templates)){fresh.drafts[id]=cleanDraft(raw.drafts?.[id],fresh.drafts[id]);fresh.collections[id]=(raw.collections?.[id]||[]).slice(0,49).map((d,i)=>({...cleanDraft(d,fresh.drafts[id]),id:/^[\w-]{1,80}$/.test(d.id)?d.id:id+'-'+i}));}fresh.phone.albums=normalizeAlbums(raw.phone?.albums,fresh.phone.photos.length);fresh.phone.hintsPolicy=raw.phone?.hintsPolicy==='off'?'off':'optional';fresh.phone.authorCredit=String(raw.phone?.authorCredit||'').slice(0,100);fresh.phone.watermarkImage=!!raw.phone?.watermarkImage;fresh.phone.watermarkHTML=!!raw.phone?.watermarkHTML;fresh.phone.hideCutout=!!raw.phone?.hideCutout;fresh.phone.customFont=customFont(raw.phone?.customFont);fresh.phone.embedFont=!!raw.phone?.embedFont;
+ function cleanDraft(raw,base={}){const d={...base};for(const [k,v] of Object.entries(raw||{})){if(['__proto__','constructor','prototype'].includes(k))continue;if(['media','authorAvatar','contactAvatar'].includes(k))d[k]=image(v);else if(k==='images')d.images=Array.isArray(v)?v.slice(0,9).map(image).filter(Boolean):[];else if(k==='attachments')d.attachments=cleanAttachments(v);else if(k==='commentItems')d.commentItems=cleanComments(v);else if(k==='members')d.members=Array.isArray(v)?v.slice(0,7).map(m=>({name:String(m.name||'').slice(0,80),avatar:image(m.avatar),readUntil:Math.max(0,Number(m.readUntil)||0)})):[];else if(['typing','unread','animateDraft'].includes(k))d[k]=!!v;else if(['unreadFrom','incomingUnread'].includes(k))d[k]=Math.max(0,Number(v)||0);else if(typeof v==='string')d[k]=v.slice(0,100000);}return d;}
+ function normalizeExtras(raw,fresh){if(raw===fresh)raw=JSON.parse(JSON.stringify(raw));if((raw.betaSchema||0)>1)throw Error('此工程来自更新版本，请先升级 FicPhone。');if((raw.screenshotSheets?.length||0)>MAX_SCREENSHOT_SHEETS)throw Error('截图稿数量超过上限，原工程未改动。');for(const id of Object.keys(templates)){if((raw.collections?.[id]?.length||0)>49)throw Error('当前每平台最多五十项内容，原工程未改动。');for(const d of [raw.drafts?.[id],...(Array.isArray(raw.collections?.[id])?raw.collections[id]:[])])if((d?.images?.length||0)>9)throw Error('每条内容最多九张图片，原工程未改动。');}fresh.betaSchema=1;fresh.assetLibrary=Array.isArray(raw.assetLibrary)?raw.assetLibrary.slice(0,40).map(asset=>({name:String(asset?.name||'').slice(0,100),src:image(asset?.src)})).filter(asset=>asset.src):[];fresh.characters=Array.isArray(raw.characters)?raw.characters.slice(0,50).map(c=>({name:String(c.name||'').slice(0,80),handle:String(c.handle||'').slice(0,100),avatar:image(c.avatar),profiles:Object.fromEntries(Object.keys(templates).map(id=>[id,{name:String(c.profiles?.[id]?.name||'').slice(0,80),handle:String(c.profiles?.[id]?.handle||(id==='instagram'?c.handle||'':'')).slice(0,100),avatar:image(c.profiles?.[id]?.avatar)}]))})):[];fresh.collections={};for(const id of Object.keys(templates)){fresh.drafts[id]=cleanDraft(raw.drafts?.[id],fresh.drafts[id]);fresh.collections[id]=(raw.collections?.[id]||[]).slice(0,49).map((d,i)=>({...cleanDraft(d,fresh.drafts[id]),id:/^[\w-]{1,80}$/.test(d.id)?d.id:id+'-'+i}));}fresh.phone.albums=normalizeAlbums(raw.phone?.albums,fresh.phone.photos.length);fresh.phone.hintsPolicy=raw.phone?.hintsPolicy==='off'?'off':'optional';fresh.phone.authorCredit=String(raw.phone?.authorCredit||'').slice(0,100);fresh.phone.watermarkImage=!!raw.phone?.watermarkImage;fresh.phone.watermarkHTML=!!raw.phone?.watermarkHTML;fresh.phone.hideCutout=!!raw.phone?.hideCutout;fresh.phone.customFont=customFont(raw.phone?.customFont);fresh.phone.embedFont=!!raw.phone?.embedFont;
   fresh.phone.font=['system','serif','mono',...Object.keys(fontCatalog)].includes(raw.phone?.font)?raw.phone.font:'system';
   if(fresh.phone.customFont&&raw.phone?.font==='custom')fresh.phone.font='custom';
-  fresh.phone.workPoints=workPoints(raw.phone?.workPoints);fresh.phone.textSize=['small','normal','large'].includes(raw.phone?.textSize)?raw.phone.textSize:'normal';for(const k of ['wallZoom','lockZoom'])fresh.phone[k]=Math.max(100,Math.min(200,Number(raw.phone?.[k])||100));for(const k of ['wallX','wallY','lockX','lockY'])fresh.phone[k]=Math.max(0,Math.min(100,Number(raw.phone?.[k]??50)));fresh.screenshotSheets=(raw.screenshotSheets||[]).slice(0,9).map((s,i)=>({id:String(s.id||'shot-'+i),name:String(s.name||'截图 '+(i+1)).slice(0,80),template:templates[s.template]?s.template:'kakao',draft:cleanDraft(s.draft),time:String(s.time||'23:10').slice(0,30),battery:Math.max(0,Math.min(100,Number(s.battery)||0)),device:devices[s.device]?s.device:fresh.device,owner:String(s.owner||fresh.owner).slice(0,80),partner:String(s.partner||fresh.partner).slice(0,80),ownerAvatar:image(s.ownerAvatar),partnerAvatar:image(s.partnerAvatar),style:{font:s.style?.font==='custom'&&fresh.phone.customFont?'custom':['system','serif','mono',...Object.keys(fontCatalog)].includes(s.style?.font)?s.style.font:'system',workPoints:workPoints(s.style?.workPoints),textSize:['small','normal','large'].includes(s.style?.textSize)?s.style.textSize:'normal',hideCutout:!!s.style?.hideCutout,language:ui[s.style?.language]?s.style.language:fresh.phone.language,batteryMode:['normal','charging','lowPower'].includes(s.style?.batteryMode)?s.style.batteryMode:'normal',androidMessages:s.style?.androidMessages==='google'?'google':'samsung',authorCredit:String(s.style?.authorCredit||'').slice(0,100),watermarkImage:!!s.style?.watermarkImage,watermarkHTML:!!s.style?.watermarkHTML}}));fresh.activeSheet=Math.max(0,Math.min(fresh.screenshotSheets.length-1,Number(raw.activeSheet)||0));return fresh;}
+  fresh.phone.workPoints=workPoints(raw.phone?.workPoints);fresh.phone.textSize=['small','normal','large'].includes(raw.phone?.textSize)?raw.phone.textSize:'normal';for(const k of ['wallZoom','lockZoom'])fresh.phone[k]=Math.max(100,Math.min(200,Number(raw.phone?.[k])||100));for(const k of ['wallX','wallY','lockX','lockY'])fresh.phone[k]=Math.max(0,Math.min(100,Number(raw.phone?.[k]??50)));const groups=new Set(),sheets=new Set();
+  fresh.screenshotGroups=(Array.isArray(raw.screenshotGroups)?raw.screenshotGroups:[]).slice(0,MAX_SCREENSHOT_SHEETS).flatMap(group=>{
+   if(!/^[\w-]{1,80}$/.test(group?.id)||groups.has(group.id))return [];
+   groups.add(group.id);
+   return [{id:group.id,name:String(group.name||'截图分组').slice(0,80)}];
+  });
+  fresh.screenshotSheets=(raw.screenshotSheets||[]).map((s,i)=>{
+   let id=String(s.id||'shot-'+i);
+   while(sheets.has(id))id+='-'+i;
+   sheets.add(id);
+   return {id,groupId:groups.has(s.groupId)?s.groupId:'',name:String(s.name||'截图 '+(i+1)).slice(0,80),template:templates[s.template]?s.template:'kakao',draft:cleanDraft(s.draft),time:String(s.time||'23:10').slice(0,30),battery:Math.max(0,Math.min(100,Number(s.battery)||0)),device:devices[s.device]?s.device:fresh.device,owner:String(s.owner||fresh.owner).slice(0,80),partner:String(s.partner||fresh.partner).slice(0,80),ownerAvatar:image(s.ownerAvatar),partnerAvatar:image(s.partnerAvatar),style:{font:s.style?.font==='custom'&&fresh.phone.customFont?'custom':['system','serif','mono',...Object.keys(fontCatalog)].includes(s.style?.font)?s.style.font:'system',workPoints:workPoints(s.style?.workPoints),textSize:['small','normal','large'].includes(s.style?.textSize)?s.style.textSize:'normal',hideCutout:!!s.style?.hideCutout,language:ui[s.style?.language]?s.style.language:fresh.phone.language,batteryMode:['normal','charging','lowPower'].includes(s.style?.batteryMode)?s.style.batteryMode:'normal',androidMessages:s.style?.androidMessages==='google'?'google':'samsung',authorCredit:String(s.style?.authorCredit||'').slice(0,100),watermarkImage:!!s.style?.watermarkImage,watermarkHTML:!!s.style?.watermarkHTML}};});fresh.activeSheet=Math.max(0,Math.min(fresh.screenshotSheets.length-1,Number(raw.activeSheet)||0));return fresh;}
  function items(state,id){return [{...state.drafts[id],id},...(state.collections?.[id]||[])];}
  function normalizeAlbums(raw,count){if(raw!=null&&!Array.isArray(raw))throw Error('相册格式不正确');if(raw?.length>50)throw Error('当前最多五十个相册');const ids=new Set();return (raw||[]).map((v,i)=>{let id=/^[\w-]{1,80}$/.test(v.id)?v.id:'album-'+i;if(ids.has(id))id+='-'+i;ids.add(id);return {id,name:String(v.name||'').slice(0,80),photoIndexes:[...new Set((Array.isArray(v.photoIndexes)?v.photoIndexes:[]).filter(n=>Number.isInteger(n)&&n>=0&&n<count))]};});}
  function removePhoto(state,index){state.phone.photos.splice(index,1);for(const album of state.phone.albums||[])album.photoIndexes=album.photoIndexes.filter(i=>i!==index).map(i=>i>index?i-1:i);for(const s of state.phone.story?.steps||[]){for(const c of [{event:s.trigger,get target(){return s.target;},set target(v){s.target=v;}},...(s.clues||[])])if(c.event==='photo'&&/^\d+$/.test(c.target)){const n=Number(c.target);c.target=n===index?'removed-photo':String(n>index?n-1:n);}}}
+ const legacyCalendarDate='2026-06-06';
+ function validDate(value){
+  if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value)||value.startsWith('0000'))return '';
+  const date=new Date(value+'T00:00:00Z');
+  return Number.isFinite(+date)&&date.toISOString().slice(0,10)===value?value:'';
+ }
+ function datedRows(script){
+  return String(script||'').split('\n').filter(Boolean).map(line=>{
+   const parts=line.split('·').map(part=>part.trim());
+   const date=parts.length>1?validDate(parts[0]):'';
+   if(date)parts.shift();
+   return {date,parts,text:date?parts.join(' · '):line};
+  });
+ }
+ function callRows(script){
+  return datedRows(script).map(({date,parts:[name,time='',...status],text})=>({
+   date,name,time,status:status.join(' · '),missed:/부재중|未接|missed|不在/i.test(text)
+  }));
+ }
+ function calendarRows(phone){
+  const rows=datedRows(phone.calendar);
+  const start=validDate(phone.calendarDate)||rows.find(row=>row.date)?.date||legacyCalendarDate;
+  return {start,rows:rows.map(({date,text})=>{
+   const match=text.match(/^(\d{1,2}:\d{2})\s*[·：:]?\s*(.*)$/);
+   return {date:date||start,time:match?.[1]||'',title:match?.[2]||text};
+  })};
+ }
  function mount(root,state,opts={}){
   ensureStyle();
   const passcode=opts.mode==='phone'&&!opts.authorPreview&&/^(?:[0-9]{4}|[0-9]{6})$/.test(state.phone.lockCode||'')?state.phone.lockCode:'';
@@ -349,7 +431,10 @@ function PocketRuntime(StoryFactory) {
   const framed=opts.frame&&!(opts.mode==='phone'&&state.phone.readerLayout==='screen');
   let view=initialView,viewed=false,notify=false,photoIndex=0,currentChat=state.phone.chatPlatform,noteId=null;const candidate=devices[state.device],device=candidate&&!candidate.disabled?candidate:devices.iphone18pro;
   const language=ui[state.phone.language]?state.phone.language:'ko',t=key=>ui[language][key]||ui.en[key]||key,nameOf=type=>appNames[language][type]||appTypes[type];
-  let currentAlbum=null,calendarDay=6,callIndex=0,callFilter='all',selected={},liked=new Set(),hintsOpen=false,hintMore=false,typingDone=new Set(),typingTimer=new Map(),hintPosition=null,suppressHintClick=false;
+  const agenda=calendarRows(state.phone),recentCalls=callRows(state.phone.calls);
+  const monthLabel=new Intl.DateTimeFormat(language,{year:'numeric',month:'long',timeZone:'UTC'});
+  const calendarLabels={zh:['上个月','下个月'],en:['Previous month','Next month'],ko:['이전 달','다음 달'],ja:['前の月','次の月']}[language];
+  let currentAlbum=null,calendarDay=agenda.start,callIndex=0,callFilter='all',selected={},liked=new Set(),hintsOpen=false,hintMore=false,typingDone=new Set(),typingTimer=new Map(),hintPosition=null,suppressHintClick=false;
   const draft=id=>items(state,id).find(d=>d.id===(selected[id]||id))||state.drafts[id];
   function allowed(route){if(opts.mode!=='phone')return true;const base=({note:'notes',photo:'album',chatlist:currentChat,igprofile:'instagram',igcomments:'instagram',instagramfeed:'instagram',xfeed:'x',xprofile:'x',forumlist:'forum',calldetail:'calls',albums:'album'})[route]||route;return !appTypes[base]||state.phone.apps.some(a=>(a.target||a.type)===base&&visibleApp(a));}
   function go(route){
@@ -421,18 +506,39 @@ function PocketRuntime(StoryFactory) {
    }
    return list;
   }
-  function attachmentMarkup(message, conversation) {
+  const voiceTitle={zh:'语音消息',en:'Voice message',ko:'음성 메시지',ja:'音声メッセージ'}[language];
+  function voiceMarkup(asset,platform,mine){
+   const recording=audio(asset.src),seconds=voiceSeconds(asset.duration);
+   const playable=opts.mode==='phone'&&recording;
+   const padded=platform!=='imessage';
+   const time=voiceTime(seconds,padded);
+   const isApple=platform==='imessage'&&device.os==='ios';
+   const playColor=isApple?(mine?'#007aff':'#fff'):'#26282d';
+   const waveColor=isApple&&mine?'#fff':'#353940';
+   const pause=playable?'<path class="voice-pause" d="M4 3h3v10H4zm5 0h3v10H9z"/>':'';
+   const voiceIcons=`<svg viewBox="0 0 16 16" fill="${playColor}" aria-hidden="true"><path class="voice-triangle" d="M4 2.5l10 5.5-10 5.5z"/>${pause}</svg>`;
+   const play=playable?`<button type="button" class="voice-play" data-voice-play aria-label="${voiceTitle}" aria-pressed="false">${voiceIcons}</button>`:`<span class="voice-play" aria-hidden="true">${voiceIcons}</span>`;
+   const bars=[6,10,8,13,17,10,6,11,18,14,8,11,6,13,19,13,9,15,7,10];
+   const wave=platform==='kakao'?'':device.os==='android'&&platform==='imessage'?'<span class="voice-track" aria-hidden="true"></span>':
+    `<svg class="voice-wave" viewBox="0 0 80 22" aria-hidden="true"><path fill="none" stroke="${waveColor}" stroke-width="${platform==='line'?1.4:2}" stroke-linecap="round" d="${bars.map((height,i)=>`M${2+i*4} ${11-height/2}v${height}`).join(' ')}"/></svg>`;
+   const audioElement=recording&&(playable||!seconds)?
+    `<audio class="voice-message" ${seconds?'':'data-voice-metadata'} preload="metadata" src="${recording}"></audio>`:'';
+   return `<div class="voice-card">${play}${wave}<time ${seconds?'':`data-voice-time="${padded?'padded':'compact'}"`}>${time}</time>${audioElement}</div>`;
+  }
+  function chatMedia(message,conversation,platform,mine){
    const marker=message.match(/\[附件-([a-z0-9-]{1,50})\]$/);
-   if(!marker)return null;
-   const source=conversation.attachments?.find(attachment=>attachment.id===marker[1])?.src;
-   if(!source)return null;
-   const title={zh:'语音消息',en:'Voice message',ko:'음성 메시지',ja:'音声メッセージ'}[language];
-   const recording=audio(source);
-   const asset=recording?(opts.mode==='phone'?`<audio class="voice-message" controls preload="metadata" aria-label="${title}" src="${recording}"></audio>`:`<span class="voice-label">◖))) ${title}</span>`):`<img src="${image(source)}" alt="">`;
-   return esc(message.slice(0,marker.index).trimEnd())+asset;
+   const asset=marker&&conversation.attachments?.find(item=>item.id===marker[1]);
+   const caption=asset?message.slice(0,marker.index).trimEnd():'';
+   if(asset&&(audio(asset.src)||voiceSeconds(asset.duration))){
+    return {className:'voice-bubble',html:(caption?`<span class="voice-caption">${esc(caption)}</span>`:'')+voiceMarkup(asset,platform,mine)};
+   }
+   const photo=asset&&image(asset.src);
+   const photos=photo?[photo]:message==='[图片]'?(conversation.images?.length?conversation.images:[conversation.media]):[];
+   const html=photos.map(image).filter(Boolean).map(src=>`<img class="chat-photo" src="${src}" alt="聊天图片">`).join('');
+   return html?{className:caption?'':'photo-bubble',html:(caption?`<span class="chat-image-caption">${esc(caption)}</span>`:'')+html}:null;
   }
   function chat(platform){const d=draft(platform),typingKey=platform+':'+(selected[platform]||platform);if(opts.mode==='phone'&&d.typing&&d.typingReply&&!typingDone.has(typingKey)&&!typingTimer.has(typingKey))typingTimer.set(typingKey,setTimeout(()=>{typingDone.add(typingKey);typingTimer.delete(typingKey);render();},Math.max(1,Math.min(30,Number(d.typingDelay)||3))*1000));const isIOS=platform==='imessage'&&device.os==='ios',isSMS=platform==='imessage'&&device.os==='android';let last='';const list=chatMessages(platform,d);
-   const messages=list.map((m,i)=>{let mine=['我',state.owner,d.ownerName,'나','me'].includes(m.who),grouped=last===m.who;last=m.who;const unread=unreadAt(list,d,state.owner,i);const text=attachmentMarkup(m.text,d)??(m.text==='[图片]'&&(d.images?.length||image(d.media))?((m.text==='[图片]'?(d.images?.length?d.images:[d.media]):[]).map(src=>`<img src="${image(src)}" alt="聊天图片">`).join('')):esc(m.text));return `<div class="msg ${mine?'mine':''} ${grouped?'grouped':''}" data-split>${mine?'':avatar(d.members?.find(v=>v.name===m.who)?.avatar||d.contactAvatar||state.partnerAvatar)}<div class="msg-col">${!mine&&!grouped?`<div class="sender">${esc(m.who)}</div>`:''}<div class="msgline"><div class="bubble">${text}</div><div class="msgmeta">${mine?`<span class="unread">${isSMS?(unread?'':t('read')):unread?(platform==='line'?'':1+(d.members||[]).filter(v=>Number(v.readUntil||0)<i+1).length):(platform==='line'?t('read'):'')}</span>`:''}<time>${esc(m.time||d.messageTime||'오후 11:08')}</time></div></div></div></div>`;}).join('');
+   const messages=list.map((m,i)=>{let mine=['我',state.owner,d.ownerName,'나','me'].includes(m.who),grouped=last===m.who&&m.group!=='另起';last=m.who;const unread=unreadAt(list,d,state.owner,i);const media=chatMedia(m.text,d,platform,mine),text=media?.html??esc(m.text);return `<div class="msg ${mine?'mine':''} ${grouped?'grouped':''}" data-split>${mine?'':avatar(d.members?.find(v=>v.name===m.who)?.avatar||d.contactAvatar||state.partnerAvatar)}<div class="msg-col">${!mine&&!grouped?`<div class="sender">${esc(m.who)}</div>`:''}<div class="msgline"><div class="bubble ${media?.className||''}">${text}</div><div class="msgmeta">${mine?`<span class="unread">${isSMS?(unread?'':t('read')):unread?(platform==='line'?'':1+(d.members||[]).filter(v=>Number(v.readUntil||0)<i+1).length):(platform==='line'?t('read'):'')}</span>`:''}<time>${esc(m.time||d.messageTime||'오후 11:08')}</time></div></div></div></div>`;}).join('');
    let header=isIOS?`<div class="screen-head imessage-header"><button data-go="chatlist" aria-label="聊天列表">${icon('back')}</button><div class="im-contact">${avatar(d.contactAvatar||state.partnerAvatar,true)}<span>${esc(d.contactName||state.partner)}${icon('back')}</span></div><div class="headicons">${icon('camera')}</div></div>`:`<div class="screen-head"><button data-go="chatlist" aria-label="聊天列表">${icon('back')}</button><strong>${esc(d.roomTitle||d.contactName||state.partner)}</strong><div class="headicons">${platform==='line'?icon('phone')+icon('menu'):icon('search')+icon('menu')}</div></div>`;
    const reply=usingStory&&progress().replies.find(reply=>reply.app===platform&&reply.room===(d.id||platform));
    const send={zh:'发送预写回复',en:'Send reply',ko:'답장 보내기',ja:'返信を送信'}[language];
@@ -466,17 +572,37 @@ function PocketRuntime(StoryFactory) {
    const storyMessages=progress()?.messages||[];
    const row=items(state,p).map(d=>{
     const latest=chatMessages(p,d,storyMessages).at(-1);
-    return `<button class="listroom" data-go="item:${p}:${esc(d.id)}">${avatar(d.members?.[0]?.avatar||d.contactAvatar||state.partnerAvatar,p!=='kakao')}<div class="roomline"><div class="roomcopy">${esc(d.roomTitle||d.contactName||state.partner)}<small>${esc(latest?.text?.replace(/\[附件-([a-z0-9-]{1,50})\]$/,(_,id)=>audio(d.attachments?.find(a=>a.id===id)?.src)?{zh:'[语音]',en:'[Voice]',ko:'[음성]',ja:'[音声]'}[language]:{zh:'[图片]',en:'[Image]',ko:'[사진]',ja:'[画像]'}[language])||'')}</small></div><div class="roomtime">${esc(latest?.time||d.messageTime||state.time)}${Number(d.incomingUnread)>0?`<span class="unreadbadge">${Number(d.incomingUnread)}</span>`:''}</div></div></button>`;
+    return `<button class="listroom" data-go="item:${p}:${esc(d.id)}">${avatar(d.members?.[0]?.avatar||d.contactAvatar||state.partnerAvatar,p!=='kakao')}<div class="roomline"><div class="roomcopy">${esc(d.roomTitle||d.contactName||state.partner)}<small>${esc(latest?.text?.replace(/\[附件-([a-z0-9-]{1,50})\]$/,(_,id)=>d.attachments?.some(a=>a.id===id&&(audio(a.src)||voiceSeconds(a.duration)))?{zh:'[语音]',en:'[Voice]',ko:'[음성]',ja:'[音声]'}[language]:{zh:'[图片]',en:'[Image]',ko:'[사진]',ja:'[画像]'}[language])||'')}</small></div><div class="roomtime">${esc(latest?.time||d.messageTime||state.time)}${Number(d.incomingUnread)>0?`<span class="unreadbadge">${Number(d.incomingUnread)}</span>`:''}</div></div></button>`;
    }).join('');
    if(p==='kakao')return `<div class="kakao-list-top"><button data-go="home" aria-label="${t('back')}">${icon('back')}</button><strong>${title}</strong><div class="list-actions">${icon('search')}${icon('chat')}${icon('more')}</div></div><div class="kakao-list-tabs"><span>${t('all')}</span><span>${t('favorite')}</span></div><div class="fill">${row}</div><div class="kakaonav"><span>${icon('user')}${t('friends')}</span><span class="active">${icon('chat')}${t('chats')}</span><span>${icon('comment')}${t('openchat')}</span><span>${icon('more')}${t('more')}</span></div>`;
    return `<div class="${samsung?'sms-list':p==='line'?'line-list':'message-list'}" style="display:flex;flex-direction:column;flex:1;min-height:0"><div class="native-topline"><button data-go="home" aria-label="${t('back')}">${icon('back')}</button><span>${p==='line'?icon('chat'):icon('note')}</span></div><div class="native-title">${title}</div><label class="native-search">${icon('search')}<input data-room-search aria-label="${t('search')}" placeholder="${t('search')}"></label><div class="fill">${row}</div></div>`;
   }
-  function callRows(){return String(state.phone.calls||'').split('\n').filter(Boolean).map(line=>{const parts=line.split('·').map(s=>s.trim());return {name:parts[0],time:parts[1]||'',status:parts.slice(2).join(' · '),missed:/부재중|未接|missed|不在/i.test(line)};});}
-  function calls(){const rows=callRows();return `<div class="native-topline"><button data-go="home" aria-label="${t('back')}">${icon('back')}</button><span>${t('edit')}</span></div><div class="native-title">${t('recent')}</div><div class="call-controls"><div class="call-segment"><button data-call-filter="all" class="${callFilter==='all'?'selected':''}">${t('all')}</button><button data-call-filter="missed" class="${callFilter==='missed'?'selected':''}">${t('missed')}</button></div>${icon('search')}</div><div class="fill">${rows.map((r,i)=>callFilter==='missed'&&!r.missed?'':`<button class="callrow ${r.missed?'missed':''}" data-call="${i}">${icon('phone')}<div class="calltext"><strong>${esc(r.name)}</strong><small>${esc(r.status||t('mobile'))}</small></div><time>${esc(r.time)}</time><span class="info">i</span></button>`).join('')}</div><div class="native-bottom"><span>${icon('heart')}${t('favorite')}</span><span class="selected">${icon('phone')}${t('recent')}</span><span>${icon('user')}${t('contacts')}</span><span>${icon('grid')}${t('keypad')}</span></div>`;}
-  function calendar(){const days=t('weekdays').split(','),events=String(state.phone.calendar||'').split('\n').filter(Boolean);return `<div class="calendar-head"><button data-go="home" aria-label="${t('back')}">${icon('back')} 2026</button><div class="list-actions">${icon('search')}${icon('plus')}</div></div><div class="calendar-month">${t('month')} 2026</div><div class="calendar-grid">${days.map(w=>`<span class="weekday">${w}</span>`).join('')}<span></span>${Array.from({length:30},(_,i)=>`<button data-day="${i+1}" class="${calendarDay===i+1?'selected':''}">${i+1}</button>`).join('')}</div><div class="event-list"><div class="event-date">2026. 6. ${calendarDay}.</div>${calendarDay!==6?`<small style="color:#999">${t('noEvents')}</small>`:events.map(line=>{const match=line.match(/^(\d{1,2}:\d{2})\s*[·：:]?\s*(.*)$/);return `<div class="event-row"><time>${esc(match?.[1]||'')}</time><div>${esc(match?.[2]||line)}</div></div>`;}).join('')}</div><div class="native-bottom"><span>${t('calendarToday')}</span><span>${nameOf('calendar')}</span><span>${t('event')}</span></div>`;}
+  function calls(){
+   const rows=recentCalls.map((r,i)=>callFilter==='missed'&&!r.missed?'':`<button class="callrow ${r.missed?'missed':''}" data-call="${i}">${icon('phone')}<div class="calltext"><strong>${esc(r.name)}</strong><small>${esc(r.status||t('mobile'))}</small></div><time>${esc(r.time)}${r.date?`<small>${r.date}</small>`:''}</time><span class="info">i</span></button>`).join('');
+   return `<div class="native-topline"><button data-go="home" aria-label="${t('back')}">${icon('back')}</button><span>${t('edit')}</span></div><div class="native-title">${t('recent')}</div><div class="call-controls"><div class="call-segment"><button data-call-filter="all" class="${callFilter==='all'?'selected':''}">${t('all')}</button><button data-call-filter="missed" class="${callFilter==='missed'?'selected':''}">${t('missed')}</button></div>${icon('search')}</div><div class="fill">${rows}</div><div class="native-bottom"><span>${icon('heart')}${t('favorite')}</span><span class="selected">${icon('phone')}${t('recent')}</span><span>${icon('user')}${t('contacts')}</span><span>${icon('grid')}${t('keypad')}</span></div>`;
+  }
+  function calendar(){
+   const month=calendarDay.slice(0,7);
+   const first=new Date(month+'-01T00:00:00Z');
+   const last=new Date(first);
+   last.setUTCMonth(last.getUTCMonth()+1,0);
+   const eventDates=new Set(agenda.rows.map(event=>event.date));
+   const days=Array.from({length:last.getUTCDate()},(_,i)=>{
+    const date=month+'-'+String(i+1).padStart(2,'0');
+    return `<button data-day="${date}" aria-pressed="${calendarDay===date}" class="${calendarDay===date?'selected ':''}${eventDates.has(date)?'has-events':''}">${i+1}</button>`;
+   }).join('');
+   const events=agenda.rows.filter(event=>event.date===calendarDay).map(event=>
+    `<div class="event-row"><time>${esc(event.time)}</time><div>${esc(event.title)}</div></div>`).join('');
+   const weekdays=t('weekdays').split(',').map(w=>`<span class="weekday">${w}</span>`).join('');
+   return `<div class="calendar-head"><button data-go="home" aria-label="${t('back')}">${icon('back')}</button><div class="calendar-nav"><button data-calendar-month="-1" aria-label="${calendarLabels[0]}" ${month==='0001-01'?'disabled':''}>‹</button><button data-calendar-month="1" aria-label="${calendarLabels[1]}" ${month==='9999-12'?'disabled':''}>›</button></div></div>
+    <div class="calendar-month">${esc(monthLabel.format(first))}</div>
+    <div class="calendar-grid">${weekdays}${'<span></span>'.repeat(first.getUTCDay())}${days}</div>
+    <div class="event-list"><div class="event-date">${calendarDay}</div>${events||`<small style="color:#777">${t('noEvents')}</small>`}</div>
+    <div class="native-bottom"><button data-calendar-start>${t('calendarToday')}</button><span>${nameOf('calendar')}</span><span>${t('event')}</span></div>`;
+  }
   function messagesGlyph(){const android=device.os==='android',google=android&&state.phone.androidMessages==='google';return `<svg class="brand-message-icon" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><rect width="64" height="64" rx="14" fill="${android?google?'#fff':'#168bf4':'#32c759'}"/><path d="M12 28C12 18 20 12 32 12s20 6 20 16-8 17-20 17c-3 0-6-.4-8-1l-11 6 3-12c-3-3-4-6-4-10Z" fill="${google?'#1a73e8':'#fff'}"/>${android?`<circle cx="24" cy="29" r="2.4" fill="${google?'#fff':'#168bf4'}"/><circle cx="32" cy="29" r="2.4" fill="${google?'#fff':'#168bf4'}"/><circle cx="40" cy="29" r="2.4" fill="${google?'#fff':'#168bf4'}"/>`:''}</svg>`;}
   const glyphs={forum:'<span style="font-family:Arial;font-size:15px;font-weight:700;letter-spacing:-1px">theqoo</span>'};
-  function appbutton(id,cfg){let target=cfg.target||id;const chat=templates[target]?.kind==='chat',art=image(cfg.icon)||image(builtInIcons[cfg.iconPreset||id]);let glyph=art?`<img src="${art}" alt="">`:glyphs[id]||icon('grid');if(id==='imessage'&&device.os==='android'&&!image(cfg.icon)&&!cfg.iconPreset)glyph=messagesGlyph();if(id==='calendar'&&!image(cfg.icon)&&!cfg.iconPreset)glyph=`<small>${t('weekdays').split(',')[6]}</small><b>6</b>`;const route=chat?'rooms:'+target:({instagram:'instagramfeed',x:'xfeed',forum:'forumlist'})[target]||target;const label=appName(cfg,state.phone);
+  function appbutton(id,cfg){let target=cfg.target||id;const chat=templates[target]?.kind==='chat',art=image(cfg.icon)||image(builtInIcons[cfg.iconPreset||id]);let glyph=art?`<img src="${art}" alt="">`:glyphs[id]||icon('grid');if(id==='imessage'&&device.os==='android'&&!image(cfg.icon)&&!cfg.iconPreset)glyph=messagesGlyph();if(id==='calendar'&&!image(cfg.icon)&&!cfg.iconPreset)glyph=`<small>${t('weekdays').split(',')[new Date(agenda.start+'T00:00:00Z').getUTCDay()]}</small><b>${Number(agenda.start.slice(-2))}</b>`;const route=chat?'rooms:'+target:({instagram:'instagramfeed',x:'xfeed',forum:'forumlist'})[target]||target;const label=appName(cfg,state.phone);
    const unread=chat?(progress()?.messages||[]).filter(m=>m.app===target&&!readMessages.has(m.id)&&(!m.withdrawAt||m.withdrawAt>Date.now())).length:0;
    return `<button class="appbutton" data-go="${esc(route)}" aria-label="${esc(label)}"><span class="appglyph ${esc(id)}">${glyph}</span>${unread?`<span class="app-unread">${unread}</span>`:''}<span>${esc(label)}</span></button>`;}
   function notesDetail(note,multiple){return `<div class="notes-toolbar"><button data-go="${multiple?'notes':'home'}" aria-label="${multiple?'返回备忘录列表':'返回桌面'}">${icon('back')}${nameOf('notes')}</button><div class="note-tools">${icon('share')}${icon('more')}</div></div><article class="note-detail"><div class="note-timestamp">${esc(note.date)}</div><h2>${esc(note.title)}</h2><div class="note-body">${esc(note.body)}</div></article><div class="note-bottom"><span>Aa</span>${icon('note')}${icon('camera')}${icon('grid')}</div>`;}
@@ -498,8 +624,9 @@ function PocketRuntime(StoryFactory) {
   }
   function calendarWidget(){
    if(!state.phone.calendarWidget||!allowed('calendar'))return '';
-   const date=state.phone.date;
-   const entry=String(state.phone.calendar||'').split('\n').find(line=>line.trim());
+   const date=validDate(state.phone.calendarDate)||agenda.start!==legacyCalendarDate?agenda.start:state.phone.date;
+   const event=agenda.rows.find(row=>row.date===agenda.start);
+   const entry=event?[event.time,event.title].filter(Boolean).join(' · '):'';
    return `<button class="calendar-widget" data-go="calendar"><small>${esc(nameOf('calendar'))}</small><strong>${esc(date)}</strong><span>${esc(entry||'')}</span></button>`;
   }
   function lockNotification(){
@@ -576,7 +703,7 @@ function PocketRuntime(StoryFactory) {
    if(view==='note'){const items=allNotes();return notesDetail(items.find(n=>n.id===noteId)||items[0]||{title:'메모',body:'',date:''},items.length>1);}
    if(view==='calendar')return calendar();
    if(view==='calls')return calls();
-   if(view==='calldetail'){const r=callRows()[callIndex]||{name:state.partner,time:'',status:''};return head(t('callDetails'),'calls')+`<div class="contact-detail">${avatar(state.partnerAvatar,true)}<h2>${esc(r.name)}</h2><div class="contact-card"><strong>${esc(r.time)}</strong><br>${esc(r.status)}<br><br><span style="color:#007aff">${t('mobile')}</span></div></div>`;}
+   if(view==='calldetail'){const r=recentCalls[callIndex]||{name:state.partner,time:'',status:''};return head(t('callDetails'),'calls')+`<div class="contact-detail">${avatar(state.partnerAvatar,true)}<h2>${esc(r.name)}</h2><div class="contact-card"><strong>${esc(r.time)}</strong>${r.date?`<br><time datetime="${r.date}">${r.date}</time>`:''}<br>${esc(r.status)}<br><br><span style="color:#007aff">${t('mobile')}</span></div></div>`;}
    return head('应用')+`<div class="blockedapp">${icon('grid')}<br>此图标仅用于桌面装饰。</div>`;
   }
   function updateBanner(){
@@ -685,6 +812,7 @@ function PocketRuntime(StoryFactory) {
   }
   function render(){
    stopDraftTyping();
+   root.querySelectorAll('.voice-message').forEach(recording=>recording.pause());
    const banner=updateBanner();
    let theme=templates[view]?.kind==='chat'?view:'';if(theme==='imessage'&&device.os==='android')theme='samsungmessages'+(state.phone.androidMessages==='google'?' googlemessages':'');let lock=view==='lock'||view==='passcode',home=view==='home',noteView=view==='notes'||view==='note',single=noteView&&allNotes().length===1;let deviceClass=`pocket-device ${theme} ${device.os} ${framed?'framed':''} ${opts.long?'long':''} ${lock?'lockdevice':''} ${home?'home-device':''} ${view==='photo'?'photo-device':''} ${noteView?'notes-device':''} ${view==='note'||single?'note-detail-device':''}`;
    const border=framed?5:0,radius=framed?device.radius:0;const wall=lock?image(state.phone.lockwallpaper):home?image(state.phone.wallpaper):'';
@@ -696,7 +824,31 @@ function PocketRuntime(StoryFactory) {
    root.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>{if(opts.mode==='phone')go(b.dataset.go);}));
    root.querySelectorAll('[data-photo]').forEach(b=>b.addEventListener('click',()=>{photoIndex=+b.dataset.photo;view='photo';if(!usingStory&&state.phone.rule&&!viewed){viewed=true;notify=true;}storyEvent('photo',String(photoIndex));render();}));
    root.querySelectorAll('[data-note]').forEach(b=>b.addEventListener('click',()=>{noteId=b.dataset.note;view='note';storyEvent('note',noteId);render();}));
-   root.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click',()=>{calendarDay=+b.dataset.day;render();}));
+   root.querySelectorAll('[data-voice-metadata]').forEach(recording=>{
+    const time=recording.parentElement.querySelector('[data-voice-time]');
+    const update=()=>{time.textContent=voiceTime(voiceSeconds(Math.ceil(recording.duration)),time.dataset.voiceTime==='padded');};
+    if(recording.readyState>=1)update();
+    else recording.addEventListener('loadedmetadata',update,{once:true});
+   });
+   root.querySelectorAll('[data-voice-play]').forEach(button=>{
+    const card=button.parentElement,recording=card.querySelector('audio');
+    button.addEventListener('click',()=>{
+     if(!recording.paused){recording.pause();return;}
+     root.querySelectorAll('.voice-message').forEach(player=>{if(player!==recording)player.pause();});
+     recording.play().catch(()=>{button.setAttribute('aria-pressed','false');});
+    });
+    recording.addEventListener('play',()=>button.setAttribute('aria-pressed','true'));
+    recording.addEventListener('pause',()=>button.setAttribute('aria-pressed','false'));
+    recording.addEventListener('ended',()=>button.setAttribute('aria-pressed','false'));
+   });
+   root.querySelectorAll('[data-day]').forEach(b=>b.addEventListener('click',()=>{calendarDay=b.dataset.day;render();}));
+   root.querySelectorAll('[data-calendar-month]').forEach(b=>b.addEventListener('click',()=>{
+    const month=new Date(calendarDay.slice(0,7)+'-01T00:00:00Z');
+    month.setUTCMonth(month.getUTCMonth()+Number(b.dataset.calendarMonth));
+    const date=validDate(month.toISOString().slice(0,10));
+    if(date){calendarDay=date;render();}
+   }));
+   root.querySelector('[data-calendar-start]')?.addEventListener('click',()=>{calendarDay=agenda.start;render();});
    root.querySelectorAll('[data-call]').forEach(b=>b.addEventListener('click',()=>{callIndex=+b.dataset.call;go('calldetail');}));
    root.querySelectorAll('[data-call-filter]').forEach(b=>b.addEventListener('click',()=>{callFilter=b.dataset.callFilter;render();}));
    const rs=root.querySelector('[data-room-search]');if(rs)rs.oninput=()=>root.querySelectorAll('.listroom').forEach(row=>row.hidden=!row.textContent.toLowerCase().includes(rs.value.toLowerCase()));
@@ -756,8 +908,8 @@ function PocketRuntime(StoryFactory) {
   }
 
   if(storyEngine){storyEvent('start','*');scheduleStory();}render();if(typeof ResizeObserver!=='undefined'){resize=new ResizeObserver(fit);resize.observe(root);}
-  return {setHintFallback,reset(){draftTypingStart.clear();hintsOpen=false;hintMore=false;for(const t of typingTimer.values())clearTimeout(t);typingTimer.clear();typingDone.clear();liked.clear();announcedMessages.clear();readMessages.clear();activeBanner=null;clearTimeout(bannerTimer);storyEngine?.reset();endingDismissed=false;clearTimeout(timer);persistStory();if(storyEngine)storyEvent('start','*');view=initialView;homePage=0;unlocked=!passcode;unlockDestination='home';viewed=false;notify=false;render();},navigate:go,destroy(){stopDraftTyping();alive=false;clearTimeout(timer);clearTimeout(bannerTimer);for(const timer of typingTimer.values())clearTimeout(timer);resize?.disconnect();root.innerHTML='';},getCapture(){return root.querySelector('[data-capture]');},getView(){return view;}};
+  return {setHintFallback,reset(){draftTypingStart.clear();hintsOpen=false;hintMore=false;for(const t of typingTimer.values())clearTimeout(t);typingTimer.clear();typingDone.clear();liked.clear();announcedMessages.clear();readMessages.clear();activeBanner=null;clearTimeout(bannerTimer);storyEngine?.reset();endingDismissed=false;clearTimeout(timer);persistStory();if(storyEngine)storyEvent('start','*');view=initialView;homePage=0;calendarDay=agenda.start;unlocked=!passcode;unlockDestination='home';viewed=false;notify=false;render();},navigate:go,destroy(){stopDraftTyping();root.querySelectorAll('.voice-message').forEach(recording=>recording.pause());alive=false;clearTimeout(timer);clearTimeout(bannerTimer);for(const timer of typingTimer.values())clearTimeout(timer);resize?.disconnect();root.innerHTML='';},getCapture(){return root.querySelector('[data-capture]');},getView(){return view;}};
  }
- return {mount,devices,templates,appTypes,css,esc,image,parse,noteItems,appNames,appName,activeApp,readerState,defaultDock,Story,batteryState,cleanDraft,normalizeExtras,items,unreadAt,fontCatalog,fontStack,normalizeAlbums,removePhoto,audio,splitMessage,commentItems,customFont,workPoints};
+ return {mount,devices,templates,appTypes,css,esc,image,parse,noteItems,appNames,appName,activeApp,readerState,defaultDock,Story,batteryState,cleanDraft,normalizeExtras,items,unreadAt,fontCatalog,fontStack,normalizeAlbums,removePhoto,audio,splitMessage,commentItems,customFont,workPoints,MAX_SCREENSHOT_SHEETS,validDate,callRows,voiceSeconds};
 }
 window.Pocket=PocketRuntime();

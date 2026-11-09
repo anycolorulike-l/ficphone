@@ -14,6 +14,12 @@
  const templateList=Object.entries(P.templates);
  const STORY_PAGE_SIZE=20;
  let storyPage=0;
+ const openContentApps=new Set();
+ const sheetView=new WeakMap();
+ function sheetViewState(){
+  if(!sheetView.has(state))sheetView.set(state,{selected:new Set(),closed:new Set()});
+  return sheetView.get(state);
+ }
  const languages=[['en','English'],['zh','中文'],['ko','한국어'],['ja','日本語']];
  function legacyAppName(value,type){const text=String(value||'').trim();const known=[P.appTypes[type],...Object.values(P.appNames).map(names=>names[type]),...(type==='forum'?['论坛','NAVER Café','네이버 카페']:[])];return known.includes(text)?'':text.slice(0,40);}
  function toast(text){$('#toast').textContent=text;$('#toast').classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('visible'),5000);}
@@ -41,6 +47,8 @@
    state.phone.lockCode=digits;previewRoute='lock';scheduleSave();renderPreview();return;
   }
   if(path==='phone.readerStart')previewRoute=state.phone.lockCode?'lock':value==='home'?'home':'lock';
+  if(path==='phone.calls')previewRoute='calls';
+  if(path==='phone.calendar'||path==='phone.calendarDate')previewRoute='calendar';
   setPath(path,path.startsWith('phone.story.')&&(path.endsWith('.delay')||path.endsWith('.withdrawAfter'))?Math.min(60,value):value);if(path.startsWith('phone.story.')&&path.endsWith('.type')&&['message','prepareReply'].includes(value)&&!['kakao','line','imessage'].includes(getPath(path.replace(/type$/,'app'))))setPath(path.replace(/type$/,'app'),'kakao');if(path.startsWith('phone.story.')&&path.endsWith('.trigger'))setPath(path.replace(/trigger$/,'target'),'*');if(match){const a=state.phone.apps[+match[1]];if(a.enabled&&a.dock&&state.phone.apps.filter(b=>b.enabled&&b.dock).length>4){a.dock=false;toast('已启用应用并放到桌面，Dock 保留四项。');}const summary=el.closest('details')?.querySelector('summary');if(summary)summary.textContent=P.appName(a,state.phone)+(a.enabled?' · 已启用':' · 未启用');}scheduleSave();if(path==='device'||path==='phone.font'||path==='phone.language'||path==='phone.androidMessages'||path.endsWith('.language')||path.startsWith('phone.story.')&&(path.endsWith('.trigger')||path.endsWith('.type')||path.endsWith('.app')||path.endsWith('.target')||path.endsWith('.enabled')))render();else renderPreview();}
  function settingsGroup(id,title,body){
   return `<details class="appsettings settings-group" data-settings-group="${id}"><summary>${title}</summary><div class="settings-fields">${body}</div></details>`;
@@ -80,8 +88,10 @@
  function renderNavigation(){if(state.mode==='screenshot'){$('#nav-label').textContent='截图模板';$('#navigation').innerHTML=templateList.map(([id,t])=>`<button data-template="${id}" aria-current="${state.template===id}"><span class="templateicon ${id}">${id==='instagram'&&P.image(window.PocketIcons?.instagram)?`<img alt="" src="${P.image(window.PocketIcons.instagram)}">`:t.mark}</span>${t.name}</button>`).join('');}else{$('#nav-label').textContent='手机与内容';$('#navigation').innerHTML=[['appearance','手机外观'],['apps','桌面应用'],['contents','应用内容'],['photos','相册与备忘录'],...(state.phone.story.enabled?[['rules','剧情触发']]:[])].map(([id,t])=>`<button data-section="${id}" aria-current="${section===id}">${t}</button>`).join('');}
   $('#navigation').querySelectorAll('[data-template]').forEach(b=>b.onclick=()=>{syncSheets();state.template=b.dataset.template;contentIndex=-1;render();scheduleSave();});$('#navigation').querySelectorAll('[data-section]').forEach(b=>b.onclick=()=>{section=b.dataset.section;previewRoute=section==='photos'?'notes':section==='appearance'?((state.phone.lockCode?'lock':state.phone.readerStart||'lock')):'home';render();});}
  function chatFields(base,draft){
-  const script=field('对话脚本',base+'.script',draft.script,'textarea','每行“名字：消息”；单条时间写法为“名字：[23:08] 消息”。“我”表示手机主人；单独写“[图片]”可插入下面上传的聊天图片。')+
-   '<div class="actions"><button type="button" id="append-message">追加我的消息</button></div>';
+  const script=field('对话脚本',base+'.script',draft.script,'textarea','每行“名字：消息”。用“名字：[23:08] 消息”设置时间。“我”表示手机主人。')+
+   `<div class="actions"><button type="button" id="append-message">追加我的消息</button>
+   <button type="button" data-add-chat-media="image">新增图片消息</button>
+   <button type="button" data-add-chat-media="voice">新增语音消息</button></div>`;
   const timing=field('日期分隔文字',base+'.date',draft.date)+field('消息时间',base+'.messageTime',draft.messageTime)+
    check('我的消息尚未读',base+'.unread',draft.unread)+
    field('未读起点（0＝自动：对方最后回复之后）',base+'.unreadFrom',draft.unreadFrom||0,'number','自动模式不会把对方回复之前的消息标为未读。填写 1、2… 可手动指定起点；序号按全部消息计算，只标记我发出的消息。')+
@@ -89,12 +99,11 @@
    field('输入状态后收到的消息（选填）',base+'.typingReply',draft.typingReply||'')+
    field('输入持续秒数（1–30）',base+'.typingDelay',draft.typingDelay||'3')+
    check('显示输入状态（互动中动画、截图中静态）',base+'.typing',draft.typing);
-  return field('会话名称（留空使用对方备注）',base+'.roomTitle',draft.roomTitle||'')+
-   script+settingsGroup('chat-unsent','未发送草稿',
+  return script+settingsGroup('chat-unsent','未发送草稿',
     field('输入框里的草稿',base+'.unsentDraft',draft.unsentDraft||'','textarea','显示在输入框里，导出时也不会成为已发送消息。')+
     check('互动试玩时逐字显示',base+'.animateDraft',draft.animateDraft))+
-   structuredMessages(base,draft)+memberEditor(base,draft)+
-   settingsGroup('images','图片与头像',file('对方头像','partnerAvatar')+gallery(base,draft))+
+   structuredMessages(base,draft)+
+   settingsGroup('chat-gallery','整组附图', '<p class="helper">脚本里单独写 [图片] 会插入这一整组。只发一张图时，可直接新增图片消息。</p>'+gallery(base,draft))+
    settingsGroup('chat-timing','时间、已读与输入状态',timing);
  }
  function postFields(base,draft){
@@ -118,13 +127,18 @@
   $('#editor-eyebrow').textContent=chat?'独立聊天截图':'独立社交截图';
   $('#editor-title').textContent=template.name;
   const example=state.owner==='미나'&&state.partner==='사나'?'<p class="helper">TWICE · 미나 × 사나 · 虚构创作示例</p>':'';
-  return settingsGroup('shot-project','工程基础设置',projectFields()+sheetControls()+collectionControls()+example)+
-   settingsGroup('shot-content',chat?'对话脚本设置':'帖子内容设置',chat?chatFields(base,draft):postFields(base,draft))+
+  const conversation=chat?settingsGroup('chat-profile','会话资料',
+   field('会话名称（留空使用对方备注）',base+'.roomTitle',draft.roomTitle||'')+
+   file('本会话对方头像',base+'.contactAvatar')+file('默认对方头像','partnerAvatar')+memberEditor(base,draft)):'';
+  return settingsGroup('shot-project','工程基础设置',projectFields()+
+   conversation+
    settingsGroup('shot-canvas','画布设置',canvasFields())+
-   settingsGroup('shot-font','字体与字号',fontFields());
+   settingsGroup('shot-font','字体与字号',fontFields())+example)+
+   settingsGroup('shot-content',chat?'对话脚本设置':'帖子内容设置',sheetControls()+collectionControls()+
+    (chat?chatFields(base,draft):postFields(base,draft)));
  }
  function showProgress(p,story){const step=story.steps[p.cursor],lines=[!story.enabled?'剧情流程未启用':p.ending?'已到达结局':p.choice?'等待读者选择':p.pending?'等待延迟动作':'等待：'+(step?step.title:'流程已完成'),`已完成 ${p.completed.length} / ${story.steps.length} 步`,...p.log.slice(-8)];$('#reader-debug-body').textContent=lines.join('\n');}
- function storyTargets(kind,index=state.phone.story.steps.length){const any=[['*','任意一项']];if(kind==='photo')return [...any,...state.phone.photos.map((_,i)=>[String(i),'照片 '+(i+1)])];if(kind==='note')return [...any,...state.phone.noteItems.map(n=>[n.id,n.title||'无标题']),...state.phone.story.steps.slice(0,index).flatMap(s=>s.actions.map((a,j)=>a.type==='note'?['story-'+s.id+'-'+j,'剧情生成：'+(a.title||'备忘录')]:null).filter(Boolean))];if(kind==='chat'||kind==='reply')return [...any,...Object.entries(P.templates).filter(([,t])=>t.kind==='chat').flatMap(([k,t])=>P.items(state,k).map(d=>[d.id,t.name+' · '+(d.roomTitle||state.partner)]))];if(kind==='like'||kind==='post')return [...any,...['instagram','x','forum'].flatMap(k=>P.items(state,k).map(d=>[d.id,P.templates[k].name+' · '+(d.title||d.body?.slice(0,15)||'帖子')]))];if(kind==='call')return [...any,...String(state.phone.calls).split('\n').filter(Boolean).map((line,i)=>[String(i),line.split('·')[0]])];if(kind==='app')return [...any,...Object.entries(P.appTypes)];return [['*','读者打开手机后']];}
+ function storyTargets(kind,index=state.phone.story.steps.length){const any=[['*','任意一项']];if(kind==='photo')return [...any,...state.phone.photos.map((_,i)=>[String(i),'照片 '+(i+1)])];if(kind==='note')return [...any,...state.phone.noteItems.map(n=>[n.id,n.title||'无标题']),...state.phone.story.steps.slice(0,index).flatMap(s=>s.actions.map((a,j)=>a.type==='note'?['story-'+s.id+'-'+j,'剧情生成：'+(a.title||'备忘录')]:null).filter(Boolean))];if(kind==='chat'||kind==='reply')return [...any,...Object.entries(P.templates).filter(([,t])=>t.kind==='chat').flatMap(([k,t])=>P.items(state,k).map(d=>[d.id,t.name+' · '+(d.roomTitle||state.partner)]))];if(kind==='like'||kind==='post')return [...any,...['instagram','x','forum'].flatMap(k=>P.items(state,k).map(d=>[d.id,P.templates[k].name+' · '+(d.title||d.body?.slice(0,15)||'帖子')]))];if(kind==='call')return [...any,...P.callRows(state.phone.calls).map((call,i)=>[String(i),[call.name,call.date,call.time].filter(Boolean).join(' · ')])];if(kind==='app')return [...any,...Object.entries(P.appTypes)];return [['*','读者打开手机后']];}
  function storyWarnings(){if(!state.phone.story.enabled)return [];const warnings=[],steps=state.phone.story.steps,unlocked=new Set();steps.forEach((s,i)=>{if(i&&s.trigger==='start')warnings.push(`第 ${i+1} 步：作品开始只能作为第一步的触发，请改用读者行为。`);if(s.target!=='*'&&!storyTargets(s.trigger,i).some(([id])=>id===s.target))warnings.push(`第 ${i+1} 步：指定内容不存在，请重新选择。`);for(const action of s.actions){
    if(['message','prepareReply'].includes(action.type)&&action.room&&!P.items(state,action.app).some(room=>room.id===action.room))warnings.push(`第 ${i+1} 步：消息的接收会话已移除，请重新选择。`);
   }
@@ -161,6 +175,25 @@
    select('相册小组件预览图','phone.homeWidgets.photoIndex',photos,widgets.photoIndex||'2')+
    '<p class="helper">小组件显示在第一页。点击备忘录或照片会直接打开对应内容。</p>';
  }
+ function appContentFields(phone){
+  const shared=select('主要聊天应用','phone.chatPlatform',templateList.filter(([,t])=>t.kind==='chat').map(([id,t])=>[id,t.name]),phone.chatPlatform)+
+   '<p class="helper">聊天与社交内容和截图模式共用，修改一次即可用于两种作品。</p>';
+  const cards=templateList.map(([id,t])=>{
+   const items=P.items(state,id);
+   const count=`<span class="content-app-count">${items.length}</span>`;
+   const rows=items.map((item,i)=>{
+    const title=item.roomTitle||item.contactName||item.title||item.body?.slice(0,35)||(t.kind==='chat'?state.partner:'')||('内容 '+(i+1));
+    return `<div class="subhead"><strong>${E(title)}</strong><button type="button" data-edit-template="${id}" data-edit-index="${i-1}">编辑内容</button></div>`;
+   }).join('');
+   return settingsGroup('content-app-'+id,t.name+' '+count,rows);
+  }).join('');
+  return `<div class="content-settings">${shared}</div>`+cards+
+   settingsGroup('content-app-calls','通话记录',
+    field('通话记录','phone.calls',phone.calls,'textarea','每行一条。可在开头加日期，例如 2026-06-07 · Sana · 22:48 · 未接来电。'))+
+   settingsGroup('content-app-calendar','日历事件',
+    field('日历打开时的日期（选填）','phone.calendarDate',phone.calendarDate||'','date','留空时，日历打开到第一条带日期的事件。未注明日期的事件放在打开当天。')+
+    field('日历事件','phone.calendar',phone.calendar,'textarea','每行一条。可在开头加日期，例如 2026-06-08 · 09:00 · 舞蹈练习。'));
+ }
  function phoneForm(){const p=state.phone;let html='';$('#editor-eyebrow').textContent='交互手机';$('#editor-title').textContent=({appearance:'手机外观',apps:'桌面应用',contents:'应用内容',photos:'相册与备忘录',rules:'剧情触发'})[section];
   if(section==='appearance'){
    const lockFields=
@@ -173,19 +206,18 @@
     field('锁屏介绍','phone.intro',p.intro,'textarea');
    const canvas=select('读者显示方式','phone.readerLayout',[['framed','手机外框'],['screen','仅显示屏幕']],p.readerLayout||'framed')+canvasFields();
    html=settingsGroup('phone-project','工程基础设置',projectFields()+
-    '<div class="actions"><button type="button" id="blank-phone">从当前设置新建空白作品</button></div>')+
-    settingsGroup('phone-lock','锁屏设置',lockFields)+
+    '<div class="actions"><button type="button" id="blank-phone">从当前设置新建空白作品</button></div>'+
     settingsGroup('phone-canvas','画布设置',canvas+
      settingsGroup('wallpaper','图片与壁纸',file('桌面壁纸','phone.wallpaper')+file('锁屏壁纸','phone.lockwallpaper')+field('桌面背景横向位置 %','phone.wallX',p.wallX??50,'number')+field('桌面背景纵向位置 %','phone.wallY',p.wallY??50,'number')+field('锁屏背景横向位置 %','phone.lockX',p.lockX??50,'number')+field('锁屏背景纵向位置 %','phone.lockY',p.lockY??50,'number')+field('桌面壁纸缩放（100–200%）','phone.wallZoom',p.wallZoom||100,'range')+field('锁屏壁纸缩放（100–200%）','phone.lockZoom',p.lockZoom||100,'range')))+
-    settingsGroup('phone-font','字体与字号',fontFields());
+    settingsGroup('phone-font','字体与字号',fontFields()))+
+    settingsGroup('phone-lock','锁屏设置',lockFields);
   }
   if(section==='apps'){
    p.homeWidgets??={overview:false,note:false,photo:false,location:'',noteId:'',photoIndex:'2'};
    html=settingsGroup('app-layout','桌面与 Dock',select('默认应用名称语言','phone.language',languages,p.language)+'<p class="helper">未启用的应用不会出现在手机中，也无法通过通知或其他入口打开。截图模板仍可单独使用。</p><div class="actions"><button type="button" id="default-dock">恢复默认 Dock 四项</button></div>'+check('桌面显示日历小组件','phone.calendarWidget',p.calendarWidget))+settingsGroup('home-widgets','首页小组件',homeWidgetFields(p))+
    settingsGroup('app-list','应用配置',p.apps.map((a,i)=>`<details class="appsettings" data-app-order="${i}"><summary draggable="true">${E(P.appName(a,p))}${a.enabled?' · 已启用':' · 未启用'}</summary><div class="actions"><button type="button" data-app-move="${i}:-1" ${i===0?'disabled':''}>上移</button><button type="button" data-app-move="${i}:1" ${i===p.apps.length-1?'disabled':''}>下移</button></div>${check('启用此应用',`phone.apps.${i}.enabled`,a.enabled)}${check('开始时锁定，等待剧情解锁',`phone.apps.${i}.locked`,a.locked)}${check('放入底部 Dock',`phone.apps.${i}.dock`,a.dock)}${select('桌面页码',`phone.apps.${i}.page`,[['1','第 1 页'],['2','第 2 页']],a.page||'1')}${select('应用名称语言',`phone.apps.${i}.language`,[['inherit','跟随默认语言'],...languages],a.language||'inherit')}${field('自定义名称（留空使用语言默认名）',`phone.apps.${i}.name`,a.name)}${select('内置图标',`phone.apps.${i}.iconPreset`,[['','自动匹配设备'],...Object.entries(P.appTypes).filter(([k])=>k!=='forum')],a.iconPreset||'')}${file('上传图标（优先显示）',`phone.apps.${i}.icon`)}${select('点击后打开',`phone.apps.${i}.target`,[...Object.entries(P.appTypes),['decoration','仅作装饰']],a.target)}</details>`).join('')+'<div class="actions"><button type="button" id="add-custom">添加自定义图标</button></div>');
   }
-  if(section==='contents')html=settingsGroup('phone-conversations','会话与帖子',select('主要聊天应用','phone.chatPlatform',Object.entries(P.templates).filter(([,t])=>t.kind==='chat').map(([k,t])=>[k,t.name]),p.chatPlatform)+`<p class="helper">聊天与社交内容和截图模式共用，修改一次即可用于两种作品。</p>`+templateList.map(([id,t])=>`<details class="appsettings" open><summary>${t.name} · ${P.items(state,id).length}</summary>${P.items(state,id).map((item,i)=>`<div class="subhead"><strong>${E(item.roomTitle||item.contactName||item.title||item.body?.slice(0,35)||(t.kind==='chat'?state.partner:'')||('内容 '+(i+1)))}</strong><button type="button" data-edit-template="${id}" data-edit-index="${i-1}">编辑内容</button></div>`).join('')}</details>`).join(''))+
-   settingsGroup('phone-records','通话与日历',field('通话记录','phone.calls',p.calls,'textarea')+field('日历事件','phone.calendar',p.calendar,'textarea'));
+  if(section==='contents')html=appContentFields(p);
   if(section==='photos')html=settingsGroup('phone-album','相册设置',file('相册照片（可多选，最多 50 张）','phone.photos',true)+field('照片说明','phone.photoCaption',p.photoCaption)+albumEditor())+
    settingsGroup('phone-notes','备忘录设置','<p class="helper">多篇显示列表；只有一篇时，直接进入该篇内容。</p>'+p.noteItems.map((n,i)=>`<details class="appsettings" open><summary>${E(n.title||'无标题')}</summary>${field('标题',`phone.noteItems.${i}.title`,n.title)}${field('正文',`phone.noteItems.${i}.body`,n.body,'textarea')}${field('修改时间',`phone.noteItems.${i}.date`,n.date)}<button class="assetclear" type="button" data-remove-note="${i}">移除此篇</button></details>`).join('')+'<div class="actions"><button type="button" id="add-note">添加备忘录</button></div>'+field('照片触发后新增的隐藏备忘录','phone.secret',p.secret,'textarea'));
   if(section==='rules')html=settingsGroup('phone-story','剧情与提示设置',storyForm());
@@ -202,19 +234,24 @@
   storyOpen=new Set([...document.querySelectorAll('.story-step[open]')].map(n=>n.dataset.step));
   const form=$('#editor-form');
   const expanded=new Set([...form.querySelectorAll('[data-settings-group][open]')].map(group=>group.dataset.settingsGroup));
+  for(const {dataset:{settingsGroup},open} of form.querySelectorAll('[data-settings-group^="content-app-"]')){
+   if(open)openContentApps.add(settingsGroup);
+   else openContentApps.delete(settingsGroup);
+  }
   form.innerHTML=state.mode==='screenshot'?screenshotForm():phoneForm();
-  form.querySelectorAll('[data-settings-group]').forEach(group=>{group.open=expanded.has(group.dataset.settingsGroup);});
+  form.querySelectorAll('[data-settings-group]').forEach(group=>{group.open=expanded.has(group.dataset.settingsGroup)||openContentApps.has(group.dataset.settingsGroup);});
   bindForm();
  }
  function render(){
   if(!state.collections)P.normalizeExtras(state,state);
+  if(state.mode==='screenshot'&&!state.screenshotSheets.length)syncSheets();
   const phone=state.mode==='phone',story=state.phone.story.enabled;
   if(phone&&!story&&section==='rules')section='appearance';
   document.querySelectorAll('[data-mode]').forEach(button=>button.setAttribute('aria-pressed',String(state.mode===button.dataset.mode)));
   $('#phone-modes').hidden=!phone;
   document.querySelectorAll('[data-phone-mode]').forEach(button=>button.setAttribute('aria-pressed',String(story===(button.dataset.phoneMode==='story'))));
   $('#mode-caption').textContent=!phone?'选择模板，直接编辑和导出':story?'用线索触发消息、解锁应用和分支':'读者自行查看聊天、照片和备忘录';
-  renderNavigation();renderEditor();$('#clear-template').hidden=state.mode!=='screenshot';renderPreview();$('#exportbar').innerHTML=state.mode==='screenshot'?'<button id="batch-export">批量导出截图 ZIP</button><button class="primary" data-export="screen">导出单屏 PNG</button><button data-export="long">导出长图</button><button data-export="pages">分页导出</button>':'<button class="primary" id="export-story">导出可交互作品 HTML</button><button id="show-desktop">查看桌面</button>';$('#exportbar').querySelectorAll('[data-export]').forEach(b=>b.onclick=()=>exportPNG(b.dataset.export));if($('#batch-export'))$('#batch-export').onclick=batchExport;if($('#export-story'))$('#export-story').onclick=exportStory;if($('#show-desktop'))$('#show-desktop').onclick=()=>player.navigate('home');
+  renderNavigation();renderEditor();$('#clear-template').hidden=state.mode!=='screenshot';renderPreview();$('#exportbar').innerHTML=state.mode==='screenshot'?'<button id="batch-export">批量导出截图 ZIP</button><button class="primary" data-export="screen">导出单屏 PNG</button><button data-export="long">导出长图</button><button data-export="pages">分页导出</button>':'<button class="primary" id="export-story">导出可交互作品 HTML</button><button id="show-desktop">查看桌面</button>';$('#exportbar').querySelectorAll('[data-export]').forEach(b=>b.onclick=()=>exportPNG(b.dataset.export));if($('#batch-export'))$('#batch-export').onclick=()=>batchExport();if($('#export-story'))$('#export-story').onclick=exportStory;if($('#show-desktop'))$('#show-desktop').onclick=()=>player.navigate('home');
   if(state.mode==='phone'&&window.FicPhonePublishingURL){
    const publish=document.createElement('button');
    publish.type='button';
@@ -225,7 +262,8 @@
  async function readImage(file){if(!['image/png','image/jpeg','image/webp','image/gif'].includes(file.type))throw Error('请选择 PNG、JPEG、WebP 或 GIF 图片。');if(file.size>15*1024*1024)throw Error('单张图片请小于 15 MB。');const data=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(Error('图片读取失败'));r.readAsDataURL(file);});const img=await new Promise((resolve,reject)=>{const el=new Image();el.onload=()=>resolve(el);el.onerror=()=>reject(Error('无法识别图片'));el.src=data;});const factor=Math.min(1,1600/img.width,1600/img.height);let canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.width*factor));canvas.height=Math.max(1,Math.round(img.height*factor));canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);return canvas.toDataURL(file.type==='image/png'?'image/png':'image/webp',.9);}
  function bindForm(){const form=$('#editor-form');form.onsubmit=e=>e.preventDefault();form.querySelectorAll('[data-path]').forEach(el=>{const handler=()=>changeField(el);el.addEventListener(el.tagName==='SELECT'||el.type==='checkbox'?'change':'input',handler);});form.querySelectorAll('[data-asset]').forEach(el=>el.onchange=async()=>{try{let files=[...el.files];if(!files.length)return;if(el.dataset.asset==='phone.photos'&&files.length+state.phone.photos.length>50)throw Error('当前版本相册最多支持 50 张照片。');let values=[];for(let f of files)values.push(await readImage(f));if(el.dataset.asset.endsWith('.images')&&values.length+(getPath(el.dataset.asset)?.length||0)>9)throw Error('每条内容最多 9 张图片。');setPath(el.dataset.asset,el.multiple?[...(getPath(el.dataset.asset)||[]),...values]:values[0]);scheduleSave();render();toast('图片已加入本机工程。');}catch(e){toast(e.message);}});form.querySelectorAll('[data-clear]').forEach(b=>b.onclick=()=>{if(b.dataset.clear==='phone.photos'&&!confirm('清空全部照片前建议导出 JSON 备份。照片相关剧情需要重新检查。确认清空？'))return;if(b.dataset.clear==='phone.photos')for(const album of state.phone.albums||[])album.photoIndexes=[];setPath(b.dataset.clear,b.dataset.clear==='phone.photos'||b.dataset.clear.endsWith('.images')?[]:'');scheduleSave();render();});if($('#append-message'))$('#append-message').onclick=()=>{currentDraft().script+='\n我：';scheduleSave();render();};if($('#add-custom'))$('#add-custom').onclick=()=>{if(state.phone.apps.length>=24)return toast('当前版本最多显示 24 个应用配置。');state.phone.apps.push({type:'custom',name:'自定义应用',language:'inherit',target:'decoration',icon:'',enabled:true,dock:false});scheduleSave();render();};form.querySelectorAll('[data-edit-template]').forEach(b=>b.onclick=()=>{syncSheets();state.template=b.dataset.editTemplate;contentIndex=Number(b.dataset.editIndex??-1);state.mode='screenshot';scheduleSave();render();$('[data-settings-group=shot-content]').open=true;});}
  function download(blob,name){let a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
- const filename=()=>String(state.title||'FicPhone').replace(/[\\/:*?"<>|]/g,'-').slice(0,60);
+ const safeFileStem=(value,fallback)=>String(value||fallback).replace(/[\\/:*?"<>|\p{Cc}]/gu,'-').slice(0,60);
+ const filename=()=>safeFileStem(state.title,'FicPhone');
  function backup(){download(new Blob([JSON.stringify(syncSheets(),null,2)],{type:'application/json'}),filename()+'.pocket.json');toast('工程已导出，包含文字与已上传图片。');}
  function normalise(raw){
   if(!raw||raw.format!=='pocket-story'||raw.version!==1)throw Error('不是支持的FicPhone 工程。');const fresh=defaults();
@@ -254,6 +292,7 @@
    if(['en','zh','ko','ja'].includes(p.language))fresh.phone.language=p.language;
    if(['samsung','google'].includes(p.androidMessages))fresh.phone.androidMessages=p.androidMessages;
    for(let key of ['date','intro','photoCaption','notes','secret','calls','calendar','newMessage'])if(typeof p[key]==='string')fresh.phone[key]=p[key].slice(0,100000);
+   if(P.validDate(p.calendarDate))fresh.phone.calendarDate=p.calendarDate;
    fresh.phone.wallpaper=P.image(p.wallpaper);fresh.phone.lockwallpaper=P.image(p.lockwallpaper);fresh.phone.photos=Array.isArray(p.photos)?p.photos.slice(0,50).map(P.image).filter(Boolean):[];fresh.phone.rule=p.rule!==false;
    fresh.phone.story=P.Story.normalize(p.story||P.Story.migrate(p));
    if(['kakao','line','imessage'].includes(p.chatPlatform))fresh.phone.chatPlatform=p.chatPlatform;
@@ -331,8 +370,24 @@
   };
  }
 
+ async function waitForVoiceMetadata(element){
+  await Promise.all([...element.querySelectorAll('[data-voice-metadata]')].map(recording=>{
+   if(recording.readyState>=1||recording.error)return;
+   return new Promise(resolve=>{
+    const finish=()=>{
+     clearTimeout(timeout);
+     recording.removeEventListener('loadedmetadata',finish);
+     recording.removeEventListener('error',finish);
+     resolve();
+    };
+    const timeout=setTimeout(finish,1500);
+    recording.addEventListener('loadedmetadata',finish);
+    recording.addEventListener('error',finish);
+   });
+  }));
+ }
  async function exportPNG(kind){if(exportBusy)return;if(!window.html2canvas)return toast('截图组件未载入，请刷新后重试。');const buttons=[...$('#exportbar').querySelectorAll('button')];buttons.forEach(b=>b.disabled=true);let host=document.createElement('div');host.style.cssText=`position:fixed;left:-10000px;top:0;width:${P.devices[state.device].w}px;pointer-events:none;`;document.body.append(host);let capturePlayer;
-  try{await document.fonts.ready;capturePlayer=P.mount(host,editingState(),{mode:'screenshot',template:state.template,frame:false,long:kind!=='screen'});let el=capturePlayer.getCapture();await window.FicFonts?.ready(state.phone.font);if(state.phone.font==='custom')await document.fonts.load('15px FicImportedFont');await Promise.all([...el.querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;})));const w=el.offsetWidth,h=el.offsetHeight;if(h>16000)throw Error('内容超过当前单次导出长度，请分段导出。工程内容不会丢失。');let scale=kind==='screen'?P.devices[state.device].scale:2;toast(kind==='screen'?'正在生成高清截图…':'正在生成长图…');let canvas=await window.html2canvas(el,{scale,backgroundColor:null,logging:false,useCORS:false,scrollX:0,scrollY:0});let pages=[];if(kind!=='pages')pages=[canvas];else{const rect=el.getBoundingClientRect(),boundaries=[...el.querySelectorAll('[data-split]')].map(n=>Math.round((n.getBoundingClientRect().top-rect.top)*scale)).filter(y=>y>0);let start=0,target=P.devices[state.device].h*scale;while(start<canvas.height){let end=Math.min(start+target,canvas.height);if(end<canvas.height){let candidates=boundaries.filter(y=>y>start+target*.4&&y<=end);if(candidates.length)end=candidates.at(-1);}if(end<=start)end=Math.min(start+target,canvas.height);let page=document.createElement('canvas');page.width=canvas.width;page.height=end-start;page.getContext('2d').drawImage(canvas,0,start,canvas.width,end-start,0,0,canvas.width,end-start);pages.push(page);start=end;}}
+  try{await document.fonts.ready;capturePlayer=P.mount(host,editingState(),{mode:'screenshot',template:state.template,frame:false,long:kind!=='screen'});let el=capturePlayer.getCapture();await window.FicFonts?.ready(state.phone.font);if(state.phone.font==='custom')await document.fonts.load('15px FicImportedFont');await Promise.all([...el.querySelectorAll('img')].map(img=>img.complete?Promise.resolve():new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;})));await waitForVoiceMetadata(el);const w=el.offsetWidth,h=el.offsetHeight;if(h>16000)throw Error('内容超过当前单次导出长度，请分段导出。工程内容不会丢失。');let scale=kind==='screen'?P.devices[state.device].scale:2;toast(kind==='screen'?'正在生成高清截图…':'正在生成长图…');let canvas=await window.html2canvas(el,{scale,backgroundColor:null,logging:false,useCORS:false,scrollX:0,scrollY:0});let pages=[];if(kind!=='pages')pages=[canvas];else{const rect=el.getBoundingClientRect(),boundaries=[...el.querySelectorAll('[data-split]')].map(n=>Math.round((n.getBoundingClientRect().top-rect.top)*scale)).filter(y=>y>0);let start=0,target=P.devices[state.device].h*scale;while(start<canvas.height){let end=Math.min(start+target,canvas.height);if(end<canvas.height){let candidates=boundaries.filter(y=>y>start+target*.4&&y<=end);if(candidates.length)end=candidates.at(-1);}if(end<=start)end=Math.min(start+target,canvas.height);let page=document.createElement('canvas');page.width=canvas.width;page.height=end-start;page.getContext('2d').drawImage(canvas,0,start,canvas.width,end-start,0,0,canvas.width,end-start);pages.push(page);start=end;}}
    const results=$('#export-results');results.innerHTML='';for(let i=0;i<pages.length;i++){let c=pages[i],blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!blob)throw Error('图片生成失败');let url=URL.createObjectURL(blob);let a=document.createElement('a');a.href=url;a.download=filename()+'-'+state.template+(pages.length>1?'-'+String(i+1).padStart(2,'0'):'')+'.png';let img=document.createElement('img');img.src=url;img.alt='截图预览 '+(i+1);a.append(img,document.createTextNode(`保存${pages.length>1?'第 '+(i+1)+' 张':''} · ${c.width}×${c.height}`));results.append(a);}
    $('#export-summary').textContent=`已生成 ${pages.length} 张 PNG。点击缩略图保存。`;$('#export-dialog').showModal();toast('截图已生成，请在预览中选择保存。');
   }catch(e){toast('导出失败：'+e.message);}finally{capturePlayer?.destroy();host.remove();buttons.forEach(b=>b.disabled=false);}
@@ -362,10 +417,76 @@
  $('#editor-form').addEventListener('click',e=>{const b=e.target.closest('[data-remove-album]');if(!b)return;P.removePhoto(state,+b.dataset.removeAlbum);previewRoute='album';scheduleSave();render();});
  function currentDraft(){return contentIndex<0?state.drafts[state.template]:state.collections[state.template][contentIndex];}
  function clone(v){return JSON.parse(JSON.stringify(v));}
- function snapshot(){return {id:'shot-'+Date.now(),name:'截图 '+((state.screenshotSheets?.length||0)+1),template:state.template,draft:clone(currentDraft()),time:state.time,battery:state.battery,device:state.device,owner:state.owner,partner:state.partner,ownerAvatar:state.ownerAvatar,partnerAvatar:state.partnerAvatar,style:{font:state.phone.font,workPoints:state.phone.workPoints,textSize:state.phone.textSize,hideCutout:state.phone.hideCutout,language:state.phone.language,batteryMode:state.phone.batteryMode,androidMessages:state.phone.androidMessages,authorCredit:state.phone.authorCredit,watermarkImage:state.phone.watermarkImage,watermarkHTML:state.phone.watermarkHTML}};}
- function syncSheets(){if(!state.collections)P.normalizeExtras(state,state);if(!state.screenshotSheets.length)state.screenshotSheets=[snapshot()];if(state.mode==='screenshot'){const old=state.screenshotSheets[state.activeSheet||0];state.screenshotSheets[state.activeSheet||0]={...snapshot(),id:old.id,name:old.name};}return state;}
+ function snapshot(){return {id:'shot-'+crypto.randomUUID(),groupId:'',name:'截图 '+((state.screenshotSheets?.length||0)+1),template:state.template,draft:clone(currentDraft()),time:state.time,battery:state.battery,device:state.device,owner:state.owner,partner:state.partner,ownerAvatar:state.ownerAvatar,partnerAvatar:state.partnerAvatar,style:{font:state.phone.font,workPoints:state.phone.workPoints,textSize:state.phone.textSize,hideCutout:state.phone.hideCutout,language:state.phone.language,batteryMode:state.phone.batteryMode,androidMessages:state.phone.androidMessages,authorCredit:state.phone.authorCredit,watermarkImage:state.phone.watermarkImage,watermarkHTML:state.phone.watermarkHTML}};}
+ function syncSheets(){if(!state.collections)P.normalizeExtras(state,state);if(!state.screenshotSheets.length)state.screenshotSheets=[snapshot()];if(state.mode==='screenshot'){const old=state.screenshotSheets[state.activeSheet||0];state.screenshotSheets[state.activeSheet||0]={...snapshot(),id:old.id,name:old.name,groupId:old.groupId};}return state;}
  function sheetState(sheet){return {...state,...sheet,drafts:{...state.drafts,[sheet.template]:sheet.draft},phone:{...state.phone,...sheet.style}};}
- function sheetControls(){return `<section class="beta-panel"><strong>截图稿 · ${state.screenshotSheets?.length||1} / 9</strong><p class="helper">每稿独立保存内容和时间；批量导出为多个 PNG。</p><div class="sheet-tabs">${(state.screenshotSheets?.length?state.screenshotSheets:[{name:'截图 1'}]).map((s,i)=>`<button type="button" data-sheet="${i}" aria-pressed="${i===(state.activeSheet||0)}">${E(s.name)}</button>`).join('')}</div><div class="actions"><button type="button" data-sheet-add>复制为新稿</button><button type="button" data-sheet-move="-1">左移</button><button type="button" data-sheet-move="1">右移</button><button type="button" data-sheet-remove>删除当前稿</button></div></section>`;}
+ function sheetGroups(){return [{id:'',name:'未分组'},...(state.screenshotGroups||[])];}
+ function sheetsInGroup(id){return state.screenshotSheets.filter(sheet=>(sheet.groupId||'')===id);}
+ function orderedSheets(){return sheetGroups().flatMap(group=>sheetsInGroup(group.id));}
+ function editSheetName(title,value,onSave){
+  openPanel(title,`<form id="sheet-name-form">
+   <label for="sheet-name-input">名称</label>
+   <input id="sheet-name-input" maxlength="80" required value="${E(value)}">
+   <div class="actions"><button type="button" id="sheet-name-cancel">取消</button><button class="primary">保存名称</button></div>
+  </form>`);
+  const dialog=$('#info-dialog'),input=$('#sheet-name-input');
+  $('#sheet-name-cancel').onclick=()=>dialog.close();
+  $('#sheet-name-form').onsubmit=event=>{
+   event.preventDefault();
+   const name=input.value.trim();
+   if(!name){input.focus();return;}
+   dialog.close();
+   onSave(name);
+   scheduleSave();
+   render();
+  };
+  input.focus();
+  input.select();
+ }
+ function sheetControls(){
+  const sheets=state.screenshotSheets,active=sheets[state.activeSheet||0];
+  const {selected,closed}=sheetViewState();
+  const groups=sheetGroups();
+  const options=groups.flatMap(group=>sheetsInGroup(group.id).map(sheet=>{
+   const name=group.id?group.name+' · '+sheet.name:sheet.name;
+   return `<option value="${sheets.indexOf(sheet)}" ${sheet===active?'selected':''}>${E(name)}</option>`;
+  })).join('');
+  const lists=groups.map((group,groupIndex)=>{
+   const items=sheetsInGroup(group.id);
+   const rows=items.map(sheet=>{
+    const index=sheets.indexOf(sheet);
+    return `<div class="sheet-row"><label><input type="checkbox" data-select-sheet="${index}" ${selected.has(sheet.id)?'checked':''}><span class="sheet-select-label">${E(sheet.name)}</span></label><button type="button" data-sheet="${index}" aria-pressed="${sheet===active}">${E(sheet.name)}</button></div>`;
+   }).join('');
+   return `<details class="sheet-group" data-sheet-group="${group.id}" ${closed.has(group.id)?'':'open'}>
+    <summary><span>${E(group.name)}</span><span class="sheet-group-count">${items.length}</span></summary>
+    <div class="sheet-rows">${rows||'<p class="helper">组内暂无截图稿。</p>'}</div>
+    <div class="actions"><button type="button" data-export-group="${group.id}" ${items.length?'':'disabled'}>导出整组</button>
+    ${group.id?`<button type="button" data-rename-group="${group.id}">重命名组</button>
+    <button type="button" data-group-move="${groupIndex-1}:-1" ${groupIndex===1?'disabled':''}>组上移</button>
+    <button type="button" data-group-move="${groupIndex-1}:1" ${groupIndex===groups.length-1?'disabled':''}>组下移</button>
+    <button type="button" data-delete-group="${group.id}">移除分组</button>`:''}</div>
+   </details>`;
+  }).join('');
+  return `<section class="beta-panel sheet-manager"><label>当前截图稿<select id="sheet-picker">${options}</select></label>
+   <button type="button" data-sheet-add ${sheets.length>=P.MAX_SCREENSHOT_SHEETS?'disabled':''}>复制为新稿</button>
+   <details class="sheet-management" data-settings-group="shot-sheets"><summary>管理截图稿</summary>
+   <p class="helper">每稿独立保存内容和时间。勾选后可批量导出。</p>
+   <div class="actions"><button type="button" data-group-add>新建分组</button><button type="button" data-export-selected ${sheets.some(sheet=>selected.has(sheet.id))?'':'disabled'}>导出所选稿</button></div>
+   ${lists}
+   <div class="sheet-current"><strong>当前稿</strong><span class="sheet-current-name">${E(active?.name||'')}</span>
+    <div class="actions"><button type="button" data-sheet-rename>重命名</button><button type="button" data-sheet-move="-1">上移</button><button type="button" data-sheet-move="1">下移</button><button type="button" data-sheet-remove>删除当前稿</button></div>
+    <label>所属分组<select id="sheet-group-select">${groups.map(group=>`<option value="${group.id}" ${group.id===(active?.groupId||'')?'selected':''}>${E(group.name)}</option>`).join('')}</select></label>
+   </div></details>
+  </section>`;
+ }
+ function loadSheet(index){
+  state.activeSheet=index;
+  const sheet=state.screenshotSheets[index];
+  for(const key of ['template','time','battery','device','owner','partner','ownerAvatar','partnerAvatar'])state[key]=sheet[key];
+  Object.assign(state.phone,sheet.style);
+  state.drafts[sheet.template]=clone(sheet.draft);
+  contentIndex=-1;
+ }
  function collectionControls(){return `<section class="beta-panel"><label>编辑会话／帖子<select id="content-select"><option value="-1" ${contentIndex<0?'selected':''}>1 · 原始内容</option>${(state.collections[state.template]||[]).map((d,i)=>`<option value="${i}" ${contentIndex===i?'selected':''}>${i+2} · ${E(d.roomTitle||d.title||d.body?.slice(0,15)||'内容')}</option>`).join('')}</select></label><div class="actions"><button type="button" data-content-add>复制为新会话／帖子</button>${contentIndex>=0?'<button type="button" data-content-remove>删除此内容</button>':''}</div></section>`;}
  function gallery(base,d){return file('附图（最多 9 张，可多选；聊天用 [图片] 插入整组）',base+'.images',true)+`<div class="asset-thumbs">${(d.images||[]).map((src,i)=>`<div><img src="${P.image(src)}" alt="图片 ${i+1}"><button type="button" data-remove-image="${base}:${i}">移除 ${i+1}</button></div>`).join('')}</div>`+(d.media?file('旧版单图（保留兼容，可移除）',base+'.media'):'');}
  function memberEditor(base,d){return `<details data-settings-group="chat-members"><summary>群聊成员（含手机主人最多九人）</summary><p class="helper">手机主人与对方占两个名额，以下最多添加七人；脚本中的发送者姓名应与成员一致。</p>${(d.members||[]).map((m,i)=>field('成员姓名',base+'.members.'+i+'.name',m.name)+file('成员头像',base+'.members.'+i+'.avatar')+field('该成员已读到第几条消息',base+'.members.'+i+'.readUntil',m.readUntil||0,'number')+`<button type="button" data-member-remove="${base}:${i}">移除成员</button>`).join('')}<button type="button" data-member-add="${base}">添加成员</button></details>`;}
@@ -386,7 +507,7 @@
  let guideSection='guide-intro';
  function guide(language='zh'){openPanel(language==='en'?'FicPhone · Step-by-step guide':'FicPhone 新手使用教程',window.FicGuide.render(language));$('#info-dialog').dataset.fixedLanguage='true';const activate=id=>{guideSection=id;$('#info-body').querySelectorAll('.guide-chapter').forEach(p=>p.hidden=p.id!==id);$('#info-body').querySelectorAll('[role="tab"]').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.guideTab===id)));$('#info-body').querySelector('.guide-panel-scroll').scrollTop=0;};$('#info-body').querySelectorAll('[data-guide-tab]').forEach(b=>b.onclick=()=>activate(b.dataset.guideTab));$('#info-body').querySelectorAll('[data-guide-language]').forEach(b=>b.onclick=()=>guide(b.dataset.guideLanguage));activate(guideSection);}
 
- function feedback(){const cfg=window.FicPhoneFeedback||{},safe=v=>typeof v==='string'&&/^https:\/\//.test(v)?E(v):'';openPanel('问题与建议',`<p>当前版本：v1.0.2-beta.1</p>${safe(cfg.privateUrl)?`<p><a target="_blank" rel="noopener" href="${safe(cfg.privateUrl)}">提交私密反馈</a></p>`:'<p>私密反馈暂不可用。可复制下方问题模板，保留操作步骤与环境信息。</p>'}${safe(cfg.publicUrl)?`<p><a target="_blank" rel="noopener" href="${safe(cfg.publicUrl)}">查看公开建议板</a></p>`:'<p>公开建议板尚未接通。</p>'}<p>请勿在公开建议中填写联系方式或其他个人信息。</p><textarea readonly>版本：v1.0.2-beta.1\n反馈类型：问题 / 建议\n设备与浏览器：${E(navigator.userAgent)}\n操作步骤：\n实际结果：\n期望结果：\n是否允许公开展示建议：否</textarea>`);}
+ function feedback(){const cfg=window.FicPhoneFeedback||{},safe=v=>typeof v==='string'&&/^https:\/\//.test(v)?E(v):'';openPanel('问题与建议',`<p>当前版本：v1.0.3-beta.1</p>${safe(cfg.privateUrl)?`<p><a target="_blank" rel="noopener" href="${safe(cfg.privateUrl)}">提交私密反馈</a></p>`:'<p>私密反馈暂不可用。可复制下方问题模板，保留操作步骤与环境信息。</p>'}${safe(cfg.publicUrl)?`<p><a target="_blank" rel="noopener" href="${safe(cfg.publicUrl)}">查看公开建议板</a></p>`:'<p>公开建议板尚未接通。</p>'}<p>请勿在公开建议中填写联系方式或其他个人信息。</p><textarea readonly>版本：v1.0.3-beta.1\n反馈类型：问题 / 建议\n设备与浏览器：${E(navigator.userAgent)}\n操作步骤：\n实际结果：\n期望结果：\n是否允许公开展示建议：否</textarea>`);}
  function redoWithConfirmation(){
   if(!redoStack.length){toast('没有可恢复的操作');return;}
   const dialog=$('#redo-dialog');
@@ -449,6 +570,37 @@
     else restoreHistory(undoStack,redoStack);
    }
   });try{if(!localStorage.getItem('ficphone-guide-beta1')){guide();localStorage.setItem('ficphone-guide-beta1','seen');}}catch{} }
+ $('#editor-form').addEventListener('toggle',event=>{
+  const group=event.target;
+  if(group.dataset.sheetGroup===undefined||!group.isConnected)return;
+  const {closed}=sheetViewState();
+  if(group.open)closed.delete(group.dataset.sheetGroup);
+  else closed.add(group.dataset.sheetGroup);
+ },true);
+ $('#editor-form').addEventListener('change',event=>{
+  const target=event.target;
+  const {selected,closed}=sheetViewState();
+  if(target.dataset.selectSheet!==undefined){
+   const sheet=state.screenshotSheets[Number(target.dataset.selectSheet)];
+   if(target.checked)selected.add(sheet.id);
+   else selected.delete(sheet.id);
+   $('[data-export-selected]').disabled=!state.screenshotSheets.some(sheet=>selected.has(sheet.id));
+  }
+  if(target.id==='sheet-picker'){
+   syncSheets();
+   loadSheet(Number(target.value));
+   scheduleSave();
+   render();
+   $('#sheet-picker').focus({preventScroll:true});
+  }
+  if(target.id==='sheet-group-select'){
+   syncSheets();
+   state.screenshotSheets[state.activeSheet].groupId=target.value;
+   closed.delete(target.value);
+   scheduleSave();
+   render();
+  }
+ });
  $('#editor-form').addEventListener('change',e=>{
   if(e.target.id==='story-page'){
    storyPage=Number(e.target.value);
@@ -458,63 +610,187 @@
   }
   if(e.target.id==='content-select'){contentIndex=+e.target.value;render();}});
  $('#editor-form').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;let changed=false;
- if(b.hasAttribute('data-sheet-add')){syncSheets();if(state.screenshotSheets.length>=9)return toast('最多九张截图稿');state.screenshotSheets.push(snapshot());state.activeSheet=state.screenshotSheets.length-1;changed=true;}
- if(b.dataset.sheet!==undefined){syncSheets();state.activeSheet=+b.dataset.sheet;const s=state.screenshotSheets[state.activeSheet];for(const k of ['template','time','battery','device','owner','partner','ownerAvatar','partnerAvatar'])state[k]=s[k];Object.assign(state.phone,s.style);state.drafts[s.template]=clone(s.draft);contentIndex=-1;changed=true;}
- if(b.hasAttribute('data-sheet-remove')){syncSheets();if(state.screenshotSheets.length<2)return toast('至少保留一张截图稿');state.screenshotSheets.splice(state.activeSheet,1);state.activeSheet=Math.min(state.activeSheet,state.screenshotSheets.length-1);const s=state.screenshotSheets[state.activeSheet];for(const k of ['template','time','battery','device','owner','partner','ownerAvatar','partnerAvatar'])state[k]=s[k];Object.assign(state.phone,s.style);state.drafts[s.template]=clone(s.draft);contentIndex=-1;changed=true;}
- if(b.dataset.sheetMove){syncSheets();const i=state.activeSheet,j=i+Number(b.dataset.sheetMove);if(state.screenshotSheets[j]){[state.screenshotSheets[i],state.screenshotSheets[j]]=[state.screenshotSheets[j],state.screenshotSheets[i]];state.activeSheet=j;changed=true;}}
+ const {selected,closed}=sheetViewState();
+ if(b.hasAttribute('data-export-selected')){batchExport(orderedSheets().filter(sheet=>selected.has(sheet.id)));return;}
+ if(b.dataset.exportGroup!==undefined){batchExport(sheetsInGroup(b.dataset.exportGroup));return;}
+ if(b.hasAttribute('data-group-add')){
+  if(state.screenshotGroups.length>=P.MAX_SCREENSHOT_SHEETS)return toast('截图分组数量已达上限。');
+  editSheetName('新建分组','',name=>state.screenshotGroups.push({id:crypto.randomUUID(),name}));
+  return;
+ }
+ if(b.dataset.renameGroup){
+  const group=state.screenshotGroups.find(item=>item.id===b.dataset.renameGroup);
+  editSheetName('重命名组',group.name,name=>{group.name=name;});
+  return;
+ }
+ if(b.dataset.groupMove){
+  const [index,delta]=b.dataset.groupMove.split(':').map(Number),groups=state.screenshotGroups;
+  if(groups[index+delta]){[groups[index],groups[index+delta]]=[groups[index+delta],groups[index]];changed=true;}
+ }
+ if(b.dataset.deleteGroup){
+  if(!confirm('移除分组？组内截图稿会移到「未分组」。'))return;
+  state.screenshotGroups=state.screenshotGroups.filter(group=>group.id!==b.dataset.deleteGroup);
+  for(const sheet of sheetsInGroup(b.dataset.deleteGroup))sheet.groupId='';
+  closed.delete('');
+  changed=true;
+ }
+ if(b.hasAttribute('data-sheet-add')){
+  syncSheets();
+  if(state.screenshotSheets.length>=P.MAX_SCREENSHOT_SHEETS)return toast('截图稿数量已达上限。');
+  const groupId=state.screenshotSheets[state.activeSheet].groupId||'';
+  state.screenshotSheets.push({...snapshot(),groupId});
+  state.activeSheet=state.screenshotSheets.length-1;
+  closed.delete(groupId);
+  changed=true;
+ }
+ if(b.dataset.sheet!==undefined){syncSheets();loadSheet(+b.dataset.sheet);changed=true;}
+ if(b.hasAttribute('data-sheet-rename')){
+  const {id,name}=state.screenshotSheets[state.activeSheet];
+  editSheetName('重命名',name,value=>{
+   const sheet=state.screenshotSheets.find(item=>item.id===id);
+   if(sheet)sheet.name=value;
+  });
+  return;
+ }
+ if(b.hasAttribute('data-sheet-remove')){
+  syncSheets();
+  if(state.screenshotSheets.length<2)return toast('至少保留一张截图稿');
+  const [removed]=state.screenshotSheets.splice(state.activeSheet,1);
+  selected.delete(removed.id);
+  loadSheet(Math.min(state.activeSheet,state.screenshotSheets.length-1));
+  closed.delete(state.screenshotSheets[state.activeSheet].groupId||'');
+  changed=true;
+ }
+ if(b.dataset.sheetMove){
+  syncSheets();
+  const sheets=state.screenshotSheets,index=state.activeSheet,sheet=sheets[index];
+  const peers=sheetsInGroup(sheet.groupId||'');
+  const destination=peers[peers.indexOf(sheet)+Number(b.dataset.sheetMove)];
+  if(destination){
+   const target=sheets.indexOf(destination);
+   [sheets[index],sheets[target]]=[sheets[target],sheets[index]];
+   state.activeSheet=target;
+   changed=true;
+  }
+ }
  if(b.hasAttribute('data-content-add')){const list=state.collections[state.template];if(list.length>=49)return toast('每个平台最多五十项内容');list.push({...clone(currentDraft()),id:state.template+'-'+Date.now()});contentIndex=list.length-1;changed=true;}
  if(b.hasAttribute('data-content-remove')){state.collections[state.template].splice(contentIndex,1);contentIndex=-1;changed=true;}
  if(b.dataset.memberAdd){const d=getPath(b.dataset.memberAdd);d.members??=[];if(d.members.length>=7)return toast('含手机主人与对方最多九人');d.members.push({name:'新成员',avatar:''});changed=true;}
  for(const [attr,key] of [['memberRemove','members'],['removeImage','images']])if(b.dataset[attr]){const [base,i]=b.dataset[attr].split(':');getPath(base)[key].splice(+i,1);changed=true;}
  if(changed){scheduleSave();render();}});
- // Stored ZIP without an external dependency; filenames are ASCII and ordered.
- async function makeZip(entries){let offset=0;const local=[],central=[],enc=new TextEncoder();const crc=bytes=>{let c=-1;for(const byte of bytes){c^=byte;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (c^-1)>>>0;};for(const [name,blob] of entries){const bytes=new Uint8Array(await blob.arrayBuffer()),n=enc.encode(name),sum=crc(bytes),h=new Uint8Array(30+n.length),v=new DataView(h.buffer);v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);v.setUint32(14,sum,true);v.setUint32(18,bytes.length,true);v.setUint32(22,bytes.length,true);v.setUint16(26,n.length,true);h.set(n,30);local.push(h,bytes);const c=new Uint8Array(46+n.length),w=new DataView(c.buffer);w.setUint32(0,0x02014b50,true);w.setUint16(4,20,true);w.setUint16(6,20,true);w.setUint32(16,sum,true);w.setUint32(20,bytes.length,true);w.setUint32(24,bytes.length,true);w.setUint16(28,n.length,true);w.setUint32(42,offset,true);c.set(n,46);central.push(c);offset+=h.length+bytes.length;}const end=new Uint8Array(22),v=new DataView(end.buffer);v.setUint32(0,0x06054b50,true);v.setUint16(8,entries.length,true);v.setUint16(10,entries.length,true);v.setUint32(12,central.reduce((n,c)=>n+c.length,0),true);v.setUint32(16,offset,true);return new Blob([...local,...central,end],{type:'application/zip'});}
- async function batchExport(){if(exportBusy)return;if(!window.html2canvas)return toast('截图组件尚未载入');syncSheets();const sheets=clone(state.screenshotSheets),entries=[];exportBusy=true;const host=document.createElement('div');host.style.cssText='position:fixed;left:-10000px;top:0';document.body.append(host);let capture;document.body.inert=true;try{await document.fonts.ready;for(let i=0;i<sheets.length;i++){const s=sheetState(sheets[i]);host.style.width=P.devices[s.device].w+'px';toast(`正在生成 ${i+1} / ${sheets.length} 张截图…`);capture=P.mount(host,s,{mode:'screenshot',template:s.template,frame:false});const el=capture.getCapture();await window.FicFonts?.ready(s.phone.font);if(s.phone.font==='custom')await document.fonts.load('15px FicImportedFont');await Promise.all([...el.querySelectorAll('img')].map(img=>img.decode().catch(()=>{})));const canvas=await window.html2canvas(el,{scale:P.devices[s.device].scale,backgroundColor:null,logging:false});const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('第 '+(i+1)+' 张截图失败');entries.push([String(i+1).padStart(2,'0')+'-'+s.template+'.png',blob]);capture.destroy();capture=null;}download(await makeZip(entries),filename()+'-screenshots.zip');toast('已导出 '+entries.length+' 张独立 PNG（ZIP）');}catch(e){toast('批量导出失败：'+e.message+'；未下载不完整文件。');}finally{capture?.destroy();host.remove();document.body.inert=false;exportBusy=false;}}
+ // Stored ZIP without an external dependency. Use the ZIP UTF-8 flag for named drafts.
+ async function makeZip(entries){let offset=0;const local=[],central=[],enc=new TextEncoder();const crc=bytes=>{let c=-1;for(const byte of bytes){c^=byte;for(let i=0;i<8;i++)c=(c>>>1)^((c&1)?0xedb88320:0);}return (c^-1)>>>0;};for(const [name,blob] of entries){const bytes=new Uint8Array(await blob.arrayBuffer()),n=enc.encode(name),sum=crc(bytes),h=new Uint8Array(30+n.length),v=new DataView(h.buffer);v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);v.setUint16(6,0x800,true);v.setUint32(14,sum,true);v.setUint32(18,bytes.length,true);v.setUint32(22,bytes.length,true);v.setUint16(26,n.length,true);h.set(n,30);local.push(h,bytes);const c=new Uint8Array(46+n.length),w=new DataView(c.buffer);w.setUint32(0,0x02014b50,true);w.setUint16(4,20,true);w.setUint16(6,20,true);w.setUint16(8,0x800,true);w.setUint32(16,sum,true);w.setUint32(20,bytes.length,true);w.setUint32(24,bytes.length,true);w.setUint16(28,n.length,true);w.setUint32(42,offset,true);c.set(n,46);central.push(c);offset+=h.length+bytes.length;}const end=new Uint8Array(22),v=new DataView(end.buffer);v.setUint32(0,0x06054b50,true);v.setUint16(8,entries.length,true);v.setUint16(10,entries.length,true);v.setUint32(12,central.reduce((n,c)=>n+c.length,0),true);v.setUint32(16,offset,true);return new Blob([...local,...central,end],{type:'application/zip'});}
+ async function batchExport(selection){if(exportBusy)return;if(!window.html2canvas)return toast('截图组件尚未载入');syncSheets();const ids=selection&&new Set(selection.map(sheet=>sheet.id));const sheets=clone(orderedSheets().filter(sheet=>!ids||ids.has(sheet.id))),entries=[];if(!sheets.length)return;exportBusy=true;const host=document.createElement('div');host.style.cssText='position:fixed;left:-10000px;top:0';document.body.append(host);let capture;document.body.inert=true;try{await document.fonts.ready;for(let i=0;i<sheets.length;i++){const s=sheetState(sheets[i]);host.style.width=P.devices[s.device].w+'px';toast(`正在生成 ${i+1} / ${sheets.length} 张截图…`);capture=P.mount(host,s,{mode:'screenshot',template:s.template,frame:false});const el=capture.getCapture();await window.FicFonts?.ready(s.phone.font);if(s.phone.font==='custom')await document.fonts.load('15px FicImportedFont');await Promise.all([...el.querySelectorAll('img')].map(img=>img.decode().catch(()=>{})));await waitForVoiceMetadata(el);const canvas=await window.html2canvas(el,{scale:P.devices[s.device].scale,backgroundColor:null,logging:false});const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)throw Error('第 '+(i+1)+' 张截图失败');entries.push([String(i+1).padStart(2,'0')+'-'+safeFileStem(s.name,s.template)+'-'+s.template+'.png',blob]);capture.destroy();capture=null;}download(await makeZip(entries),filename()+'-screenshots.zip');toast('已导出 '+entries.length+' 张独立 PNG（ZIP）');}catch(e){toast('批量导出失败：'+e.message+'；未下载不完整文件。');}finally{capture?.destroy();host.remove();document.body.inert=false;exportBusy=false;}}
 
- function structuredMessages(base,d){return `<details data-settings-group="chat-messages"><summary>逐条编辑消息与时间</summary><p class="helper">与上方脚本同步；支持每条消息单独设置时间。</p>${P.parse(d.script).map((m,i)=>{const parts=P.splitMessage(m);return `<div class="message-edit"><label>发送者<input data-msg="${i}" data-msg-key="who" value="${E(m.who)}"></label><label>时间<input data-msg="${i}" data-msg-key="time" value="${E(parts.time||'')}"></label><label>消息<textarea data-msg="${i}" data-msg-key="text">${E(parts.text.replace(/\[附件-[a-z0-9-]+\]$/,'').trimEnd())}</textarea></label><label>此条消息的图片或语音<input type="file" data-message-file="${i}" accept="image/png,image/jpeg,image/webp,image/gif,audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm"></label>${/\[附件-[a-z0-9-]+\]$/.test(parts.text)?`<button type="button" data-remove-attachment="${i}">移除附件</button>`:''}<button type="button" data-delete-msg="${i}">删除此消息</button></div>`;}).join('')}</details>`;}
- $('#editor-form').addEventListener('change',e=>{if(!e.target.dataset.msg)return;const i=+e.target.dataset.msg,rows=P.parse(currentDraft().script),m=rows[i],parts=P.splitMessage(m),marker=parts.text.match(/\[附件-[a-z0-9-]+\]$/)?.[0]||'';let text=parts.text.slice(0,parts.text.length-marker.length).trimEnd(),time=parts.time||'';const key=e.target.dataset.msgKey;if(key==='who')m.who=e.target.value;if(key==='text')text=e.target.value.replaceAll('\n',' ');if(key==='time')time=e.target.value;m.text=(time?'['+time+'] ':'')+text+(marker?' '+marker:'');currentDraft().script=rows.map(m=>m.who+'：'+m.text).join('\n');scheduleSave();render();});
- $('#editor-form').addEventListener('click',e=>{const b=e.target.closest('[data-delete-msg]');if(!b)return;const rows=P.parse(currentDraft().script);const [removed]=rows.splice(+b.dataset.deleteMsg,1);const id=removed?.text.match(/\[附件-([a-z0-9-]+)\]$/)?.[1];if(id)currentDraft().attachments=currentDraft().attachments?.filter(asset=>asset.id!==id)||[];currentDraft().script=rows.map(m=>m.who+'：'+m.text).join('\n');scheduleSave();render();});
-
- function setAttachment(draft,index,source){
-  const rows=P.parse(draft.script),message=rows[index];
-  const old=message.text.match(/\[附件-([a-z0-9-]+)\]$/);
-  const attachments=(draft.attachments||[]).filter(asset=>asset.id!==old?.[1]&&draft.script.includes('[附件-'+asset.id+']'));
-  if(old)message.text=message.text.slice(0,old.index).trimEnd();
-  if(source){
-   if(attachments.length>=60)throw Error('每个会话最多 60 个附件。');
-   const id=crypto.randomUUID();
-   attachments.push({id,src:source});
-   message.text+=' [附件-'+id+']';
-  }
-  draft.attachments=attachments;
+ const imageAccept="image/png,image/jpeg,image/webp,image/gif";
+ const voiceAccept="audio/mpeg,audio/mp4,audio/ogg,audio/wav,audio/webm,.m4a,.wav";
+ function structuredMessages(base,d){return `<details data-settings-group="chat-messages"><summary>逐条编辑消息与时间</summary><p class="helper">与上方脚本同步；支持每条消息单独设置时间。</p>${P.parse(d.script).map((m,i)=>{const parts=P.splitMessage(m);return `<div class="message-edit"><label>发送者<input data-msg="${i}" data-msg-key="who" value="${E(m.who)}"></label><label>时间<input data-msg="${i}" data-msg-key="time" value="${E(parts.time||'')}"></label><label>消息分组<select data-msg="${i}" data-msg-key="group"><option value="">自动</option><option value="另起" ${parts.group==='另起'?'selected':''}>另起一组</option><option value="接续" ${parts.group==='接续'?'selected':''}>接续上一组</option></select></label><label>消息<textarea data-msg="${i}" data-msg-key="text">${E(parts.text.replace(/\[附件-[a-z0-9-]+\]$/,'').trimEnd())}</textarea></label><label>此条消息的图片或语音<input type="file" data-message-file="${i}" accept="${imageAccept},${voiceAccept}"></label>${/\[附件-[a-z0-9-]+\]$/.test(parts.text)?`<button type="button" data-remove-attachment="${i}">移除附件</button>`:''}<button type="button" data-delete-msg="${i}">删除此消息</button></div>`;}).join('')}</details>`;}
+ $('#editor-form').addEventListener('change',e=>{if(!e.target.dataset.msg)return;const i=+e.target.dataset.msg,rows=P.parse(currentDraft().script),m=rows[i],parts=P.splitMessage(m),marker=parts.text.match(/\[附件-[a-z0-9-]+\]$/)?.[0]||'';let text=parts.text.slice(0,parts.text.length-marker.length).trimEnd(),time=parts.time||'',group=parts.group||'';const key=e.target.dataset.msgKey;if(key==='who')m.who=e.target.value;if(key==='text')text=e.target.value.replaceAll('\n',' ');if(key==='time')time=e.target.value;if(key==='group')group=e.target.value;m.text=(time?'['+time+'] ':'')+(group?'[分组-'+group+'] ':'')+text+(marker?' '+marker:'');currentDraft().script=rows.map(m=>m.who+'：'+m.text).join('\n');scheduleSave();render();});
+ function saveMessageRows(draft,rows,attachments=draft.attachments||[]){
   draft.script=rows.map(row=>row.who+'：'+row.text).join('\n');
+  draft.attachments=attachments.filter(asset=>rows.some(row=>row.text.endsWith('[附件-'+asset.id+']')));
   scheduleSave();
   render();
-  $('#editor-form').querySelector('[data-settings-group=chat-messages]')?.setAttribute('open','');
  }
  $('#editor-form').addEventListener('click',event=>{
-  const button=event.target.closest('[data-remove-attachment]');
-  if(button)setAttachment(currentDraft(),+button.dataset.removeAttachment,'');
+  const button=event.target.closest('[data-delete-msg],[data-remove-attachment],[data-add-chat-media]');
+  if(!button)return;
+  if(button.dataset.addChatMedia){addChatMedia(button.dataset.addChatMedia);return;}
+  const draft=currentDraft(),rows=P.parse(draft.script);
+  if(button.dataset.deleteMsg!==undefined){
+   rows.splice(Number(button.dataset.deleteMsg),1);
+  }else{
+   const message=rows[Number(button.dataset.removeAttachment)];
+   if(!message)return;
+   message.text=message.text.replace(/\s*\[附件-[a-z0-9-]+\]$/,'');
+  }
+  saveMessageRows(draft,rows);
  });
+ function attachToMessage(draft,rows,message,asset){
+  const oldMarker=message.text.match(/\[附件-([a-z0-9-]+)\]$/);
+  const attachments=(draft.attachments||[]).filter(item=>rows.some(row=>row!==message&&row.text.endsWith('[附件-'+item.id+']')));
+  if(attachments.length>=60)throw Error('每个会话最多 60 个附件。');
+  const id=crypto.randomUUID();
+  if(oldMarker)message.text=message.text.slice(0,oldMarker.index).trimEnd();
+  message.text=[message.text,'[附件-'+id+']'].filter(Boolean).join(' ');
+  saveMessageRows(draft,rows,[...attachments,{id,...asset}]);
+ }
+ async function readMessageAsset(file){
+  const type=file.type.toLowerCase();
+  const audioType=({'audio/x-wav':'audio/wav','audio/wave':'audio/wav','audio/x-m4a':'audio/mp4'})[type]||type||
+   (/\.m4a$/i.test(file.name)?'audio/mp4':/\.wav$/i.test(file.name)?'audio/wav':'');
+  if(!audioType.startsWith('audio/'))return {src:await readImage(file)};
+  if(file.size>2*1024*1024)throw Error('语音文件请小于 2 MB。');
+  const src=await new Promise((resolve,reject)=>{
+   const reader=new FileReader();
+   reader.onload=()=>resolve(P.audio(reader.result.replace(/^data:[^;,]+/,'data:'+audioType)));
+   reader.onerror=reject;
+   reader.readAsDataURL(file);
+  });
+  if(!src)throw Error('请选择 MP3、M4A、OGG、WAV 或 WebM 音频。');
+  const duration=await new Promise(resolve=>{
+   const player=new Audio();
+   const finish=value=>{
+    clearTimeout(timeout);
+    player.onloadedmetadata=null;
+    player.onerror=null;
+    player.removeAttribute('src');
+    player.load();
+    resolve(P.voiceSeconds(Math.ceil(value)));
+   };
+   const timeout=setTimeout(()=>finish(0),2500);
+   player.preload='metadata';
+   player.onloadedmetadata=()=>finish(player.duration);
+   player.onerror=()=>finish(0);
+   player.src=src;
+  });
+  return {src,duration};
+ }
+ function addChatMedia(kind){
+  const draft=currentDraft(),voice=kind==='voice';
+  const senders=[...new Set(['我',draft.contactName||state.partner,...(draft.members||[]).map(member=>member.name),...P.parse(draft.script).map(row=>row.who)].filter(Boolean))];
+  openPanel(voice?'新增语音消息':'新增图片消息',`<form id="chat-media-form">
+   <label>发送者<select name="sender">${senders.map(name=>`<option value="${E(name)}">${E(name)}</option>`).join('')}</select></label>
+   <label>消息时间（选填）<input name="messageTime" type="time"></label>
+   <label>${voice?'上传语音（选填）':'选择图片'}<input name="asset" type="file" accept="${voice?voiceAccept:imageAccept}" ${voice?'':'required'}></label>
+   ${voice?'<label>显示时长（秒）<input name="duration" type="number" min="1" max="3599" step="1"></label><p class="helper">上传音频可自动读取时长。只做语音条时，填写时长即可。</p>':''}
+   <div class="actions"><button type="button" id="cancel-chat-media">取消</button><button class="primary">添加消息</button></div>
+   </form>`);
+  const dialog=$('#info-dialog'),form=$('#chat-media-form');
+  $('#cancel-chat-media').onclick=()=>dialog.close();
+  form.onsubmit=async event=>{
+   event.preventDefault();
+   const submit=form.querySelector('[type=submit],.primary');
+   if(submit.disabled)return;
+   const fields=form.elements,file=fields.asset.files[0];
+   const duration=voice?P.voiceSeconds(Number(fields.duration.value)):0;
+   if(!file&&!duration){fields.duration?.focus();return toast('请上传语音或填写显示时长。');}
+   const script=draft.script,who=fields.sender.value,time=fields.messageTime.value;
+   submit.disabled=true;
+   try{
+    const asset=file?await readMessageAsset(file):{src:'',duration};
+    if(!dialog.open||!form.isConnected)return;
+    if(currentDraft()!==draft||draft.script!==script)throw Error('会话已改变，请重新添加消息。');
+    if(voice&&file&&!P.audio(asset.src))throw Error('请选择音频文件。');
+    if(!voice&&!P.image(asset.src))throw Error('请选择图片文件。');
+    if(duration)asset.duration=duration;
+    const rows=P.parse(script),message={who,text:time?'['+time+']':''};
+    rows.push(message);
+    attachToMessage(draft,rows,message,asset);
+    dialog.close();
+   }catch(error){toast(error.message||'无法读取附件。');}
+   finally{submit.disabled=false;}
+  };
+ }
  $('#editor-form').addEventListener('change',async event=>{
-  const index=event.target.dataset.messageFile;
-  const file=event.target.files?.[0];
+  const index=event.target.dataset.messageFile,file=event.target.files?.[0];
   if(index===undefined||!file)return;
   const draft=currentDraft(),script=draft.script;
   try{
-   let source;
-   if(file.type.startsWith('audio/')){
-    if(file.size>2*1024*1024)throw Error('语音文件请小于 2 MB。');
-    source=await new Promise((resolve,reject)=>{
-     const reader=new FileReader();
-     reader.onload=()=>resolve(P.audio(reader.result));
-     reader.onerror=reject;
-     reader.readAsDataURL(file);
-    });
-    if(!source)throw Error('请选择 MP3、M4A、OGG、WAV 或 WebM 音频。');
-   }else source=await readImage(file);
+   const asset=await readMessageAsset(file);
    if(currentDraft()!==draft||draft.script!==script)throw Error('消息已改变，请重新选择附件。');
-   setAttachment(draft,+index,source);
+   const rows=P.parse(script);
+   if(rows[Number(index)])attachToMessage(draft,rows,rows[Number(index)],asset);
   }catch(error){toast(error.message||'无法读取附件。');}
  });
 
@@ -696,7 +972,7 @@
    next.drafts[platform]=Object.fromEntries(Object.entries(defaultDraft).map(([key,value])=>[key,typeof value==='boolean'?false:'']));
    next.collections[platform]=[];
   }
-  for(const key of ['date','intro','notes','secret','calls','calendar','newMessage','photoCaption'])next.phone[key]='';
+  for(const key of ['date','intro','notes','secret','calls','calendar','calendarDate','newMessage','photoCaption'])next.phone[key]='';
   for(const key of ['photos','albums','noteItems'])next.phone[key]=[];
   next.phone.story=P.Story.normalize({enabled:storyEnabled,steps:[]});
   next.phone.rule=false;
@@ -704,6 +980,7 @@
   next.phone.lockCode='';
   if(next.phone.homeWidgets){next.phone.homeWidgets.location='';next.phone.homeWidgets.noteId='';}
   next.screenshotSheets=[];
+  next.screenshotGroups=[];
   next.activeSheet=0;
   buttons.forEach(button=>button.disabled=true);
   try{
@@ -788,8 +1065,31 @@
     'チャット画像とインタラクティブなスマホ作品に対応した公開ベータです。']
   }[language];
   const [title,latest,...earlier]=copy||['Changelog'];
+  const currentChanges={
+   zh:[
+    '调整了截图稿上限。可在对话或帖子编辑区切换稿件，支持分组、重命名、排序和选稿导出 ZIP。',
+    '聊天可直接新增单张图片或语音消息，分别指定发送者和时间。语音条可仅填时长，上传音频后读者可点击播放。连续消息可手动另起一组。',
+    '交互手机的应用内容按 App 折叠。通话和日历可录入多天内容，日历支持指定打开日期和跨月浏览。',
+    '画布和字体字号归入工程基础设置，聊天名称、头像和群聊成员归入会话资料。一级标题缩小并收紧留白。'],
+   en:[
+    'Adjusted the screenshot sheet limit. Switch sheets in the conversation or post editor, then group, rename, reorder or export selected sheets as a ZIP.',
+    'Add a photo or voice message with its own sender and time. Enter a duration for a static voice bubble or upload audio for readers to play. Start a new visual group within consecutive messages.',
+    'Collapse interactive phone content by app. Add calls and events on multiple dates, set the calendar opening date and browse across months.',
+    'Find canvas and font controls in Project basics, and chat names, avatars and group members in Conversation details. Top-level headings are smaller with less padding.'],
+   ko:[
+    '스크린샷 개수 제한을 조정했습니다. 편집 화면에서 스크린샷을 전환하고 그룹, 이름, 순서를 관리하거나 선택한 항목을 ZIP으로 내보낼 수 있습니다.',
+    '보낸 사람과 시간을 지정해 사진 한 장이나 음성 메시지를 추가할 수 있습니다. 길이만 입력하면 정적 말풍선이 표시되고, 음성을 올리면 독자가 재생할 수 있습니다. 연속 메시지는 새 묶음으로 시작할 수 있습니다.',
+    '인터랙티브 휴대전화의 콘텐츠를 앱별로 접을 수 있습니다. 여러 날짜에 통화와 일정을 추가하고 캘린더 시작 날짜를 설정하거나 월을 넘겨 볼 수 있습니다.',
+    '캔버스와 글꼴은 프로젝트 기본 설정에서, 대화 이름과 프로필 사진 및 멤버는 대화 정보에서 설정합니다. 상위 제목의 크기와 여백을 줄였습니다.'],
+   ja:[
+    'スクリーンショットの上限を調整しました。編集欄から切り替え、グループ分け、名前と順序の変更、選択した画像のZIP出力ができます。',
+    '送信者と時刻を指定して画像1枚や音声を追加できます。長さだけでも音声の吹き出しを作成でき、音声をアップロードすると読者が再生できます。連続するメッセージを新しいまとまりに分けられます。',
+    'インタラクティブなスマートフォンの内容をアプリごとに折りたためます。複数の日付に通話と予定を追加でき、カレンダーの開始日を指定し、月を切り替えて閲覧できます。',
+    'キャンバスとフォントはプロジェクトの基本設定に、トーク名・アイコン・メンバーはトーク情報にまとめました。上位見出しの文字と余白を小さくしました。']
+  };
   const releases=[
-   ['v1.0.2-beta.1','2026-11-08',latest?[latest]:[],true],
+   ['v1.0.3-beta.1','2026-11-09',currentChanges[language]||currentChanges.en,true],
+   ['v1.0.2-beta.1','2026-11-08',[latest].filter(Boolean)],
    ['v1.0.1-beta.1','2026-11-07',earlier.slice(0,-1)],
    ['v1.0.0-beta.1','2026-11-06',earlier.slice(-1)]
   ];
@@ -814,7 +1114,7 @@
  $('#editor-form').addEventListener('change',e=>{const value=e.target.dataset.albumMember;if(value===undefined)return;const [i,j]=value.split(':').map(Number),album=state.phone.albums[i];album.photoIndexes=e.target.checked?[...new Set([...album.photoIndexes,j])].sort((a,b)=>a-b):album.photoIndexes.filter(v=>v!==j);previewRoute='albums';scheduleSave();renderPreview();});
 
  function notice(kind){const language=document.documentElement.lang,english=!language.startsWith('zh'),t=(zh,en)=>english?en:zh;
- if(kind==='privacy')openPanel(t('隐私与数据','Privacy & data'),`<p>${t('当前版本：v1.0.2-beta.1。以下说明针对当前版本的创作编辑器。','Current version: v1.0.2-beta.1. This notice describes the current editor.')}</p><h3>${t('创作内容保存在当前浏览器','Your work stays in this browser')}</h3><p>${t('编辑器使用当前浏览器的本机存储保存工程、素材和设置。日常编辑和自动保存只使用本机存储。主动发布时上传的数据见下文。FicPhone 不提供云端备份。','The editor stores projects, media and settings in this browser’s local storage. Editing and autosave use local storage. See below for the data sent when you choose to publish. FicPhone does not provide cloud backups.')}</p><h3>${t('保存不等于备份','Saving is not a backup')}</h3><p>${t('清理网站数据、浏览器隐私模式、存储空间不足、换浏览器、设备或网址，都可能使原草稿不可用。请定期导出 JSON 工程备份，并自行保存。','Clearing site data, private browsing, storage limits, or changing browser, device or site address can make drafts unavailable. Export project JSON backups regularly and keep them safely.')}</p><h3>${t('导出与分享由你控制','You control exports and sharing')}</h3><p>${t('导出会在本机生成 PNG、ZIP、JSON 或 HTML 文件。受邀作者点击「发布」时，FicPhone 会把读者版内容和作品信息上传至发布服务，用于生成可分享链接。可编辑草稿、工程库与素材库本身保存在当前浏览器。','Export generates PNG, ZIP, JSON or HTML files on your device. When invited creators choose Publish, FicPhone sends the reader edition and its listing details to the publishing service. Editable drafts, project backups and the media library stay in the current browser.')}</p><h3>${t('访问日志与第三方链接','Hosting logs and external links')}</h3><p>${t('网站启用访问统计时，Cloudflare Web Analytics 会接收网页访问和性能指标。互动 HTML 导出不包含统计代码。GitHub Pages 也可能为安全目的记录访问者 IP。','When site analytics are enabled, Cloudflare Web Analytics receives page visit and performance metrics. Standalone HTML exports exclude analytics. GitHub Pages may also record visitor IP addresses for security.')}</p><p><a href="https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages" target="_blank" rel="noopener">GitHub Pages · Data collection</a></p>`);
+ if(kind==='privacy')openPanel(t('隐私与数据','Privacy & data'),`<p>${t('当前版本：v1.0.3-beta.1。以下说明针对当前版本的创作编辑器。','Current version: v1.0.3-beta.1. This notice describes the current editor.')}</p><h3>${t('创作内容保存在当前浏览器','Your work stays in this browser')}</h3><p>${t('编辑器使用当前浏览器的本机存储保存工程、素材和设置。日常编辑和自动保存只使用本机存储。主动发布时上传的数据见下文。FicPhone 不提供云端备份。','The editor stores projects, media and settings in this browser’s local storage. Editing and autosave use local storage. See below for the data sent when you choose to publish. FicPhone does not provide cloud backups.')}</p><h3>${t('保存不等于备份','Saving is not a backup')}</h3><p>${t('清理网站数据、浏览器隐私模式、存储空间不足、换浏览器、设备或网址，都可能使原草稿不可用。请定期导出 JSON 工程备份，并自行保存。','Clearing site data, private browsing, storage limits, or changing browser, device or site address can make drafts unavailable. Export project JSON backups regularly and keep them safely.')}</p><h3>${t('导出与分享由你控制','You control exports and sharing')}</h3><p>${t('导出会在本机生成 PNG、ZIP、JSON 或 HTML 文件。受邀作者点击「发布」时，FicPhone 会把读者版内容和作品信息上传至发布服务，用于生成可分享链接。可编辑草稿、工程库与素材库本身保存在当前浏览器。','Export generates PNG, ZIP, JSON or HTML files on your device. When invited creators choose Publish, FicPhone sends the reader edition and its listing details to the publishing service. Editable drafts, project backups and the media library stay in the current browser.')}</p><h3>${t('访问日志与第三方链接','Hosting logs and external links')}</h3><p>${t('网站启用访问统计时，Cloudflare Web Analytics 会接收网页访问和性能指标。互动 HTML 导出不包含统计代码。GitHub Pages 也可能为安全目的记录访问者 IP。','When site analytics are enabled, Cloudflare Web Analytics receives page visit and performance metrics. Standalone HTML exports exclude analytics. GitHub Pages may also record visitor IP addresses for security.')}</p><p><a href="https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages" target="_blank" rel="noopener">GitHub Pages · Data collection</a></p>`);
  else openPanel(t('版权与素材','Copyright & materials'),`<p>FicPhone · © 2026 anycolorulike</p><p>${t('FicPhone 的品牌、原创界面设计与使用文档由 anycolorulike 创作。使用、转载或修改相关内容，请遵循随附许可；未注明授权的内容请先联系作者。','FicPhone branding, original interface design and documentation are by anycolorulike. Reuse and modifications are subject to the accompanying licenses; contact the author for materials without stated permission.')}</p><h3>${t('第三方素材分别适用其权利与许可','Third-party materials retain their own terms')}</h3><p>${t('平台名称、商标、应用图标、人物照片和第三方代码、字体不因出现在 FicPhone 中而归工具作者所有。四款新增字体按 SIL Open Font License 提供，许可说明随网站与使用这些字体的 HTML 导出保留。','Platform names, trademarks, app icons, photographs, third-party code and fonts are not owned by the tool author merely because they appear here. The four added fonts use the SIL Open Font License; notices are included with the site and HTML exports using them.')}</p><p>${t('示例人物照片仅用于展示创作效果，相关权利归原权利人所有。','Sample photographs demonstrate creative features. Their respective rights remain with their rights holders.')}</p><h3>${t('作者创作的作品','Creators’ works')}</h3><p>${t('使用 FicPhone 不会把你的故事、文字或原创素材转让给工具作者。本说明也不替你获得所用第三方素材的授权。','Using FicPhone does not transfer your story, writing or original materials to the tool author. This notice does not grant rights in third-party materials you choose to use.')}</p>`);}
 
 })();
